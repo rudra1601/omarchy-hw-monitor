@@ -177,32 +177,37 @@ Panel {
                    base.a)
   }
 
+  // Each figure reserves the width of its usual two digits in the chosen
+  // format, so 5% → 15% does not shove the neighbours along, but nothing is
+  // held open for a rare third digit (100%, 100°C): that just grows the cell.
+  // RAM reserves nothing: its digit count changes only when usage crosses
+  // 10 GiB, and a reserved "00.0/00G" left a gap every other minute.
   readonly property int percentSlot: Math.ceil(percentMetrics.advanceWidth)
   readonly property int tempSlot: Math.ceil(tempMetrics.advanceWidth)
-  readonly property int ramSlot: Math.ceil(ramMetrics.advanceWidth)
+
+  readonly property string tempTemplate: {
+    var unit = fahrenheit ? "F" : "C"
+    var text = fahrenheit ? "000" : "00"
+    if (tempFormat === "degree-unit") text += "°" + unit
+    else if (tempFormat === "degree") text += "°"
+    else if (tempFormat === "unit") text += unit
+    else if (tempFormat === "unit-lower") text += unit.toLowerCase()
+    return (labelled || percentPad === "lead") ? Model.padLeft(text, 3) : text
+  }
 
   TextMetrics {
     id: percentMetrics
     font.family: root.fontFamily
     font.pixelSize: root.valueSize
-    text: "100%"
+    font.bold: true
+    text: "00%"
   }
 
   TextMetrics {
     id: tempMetrics
     font.family: root.fontFamily
     font.pixelSize: root.valueSize
-    text: "100°C"
-  }
-
-  // Representative widest figure per RAM format; the cell never shrinks below
-  // this, so neighbours stop dancing when a digit comes or goes. Wider values
-  // still grow naturally instead of clipping.
-  TextMetrics {
-    id: ramMetrics
-    font.family: root.fontFamily
-    font.pixelSize: root.valueSize
-    text: root.ramFormat === "percent" ? "100%" : (root.ramFormat === "used/total" ? "00.0/00G" : "00.0G")
+    text: root.tempTemplate
   }
 
   // --------------------------------------------------------------- readings
@@ -550,7 +555,7 @@ Panel {
       id: horizontalCells
       visible: !root.vertical
       anchors.centerIn: parent
-      spacing: Style.space(root.mode === "icons" ? 14 : 8)
+      spacing: Style.space(root.mode === "icons" ? 10 : 8)
 
       Repeater {
         model: root.cells
@@ -618,9 +623,10 @@ Panel {
       // an invisible trailing gap instead of pulling its neighbours around.
       // The old trail-only reservation is subsumed by this.
       readonly property int figureSlot: group.isTempCell ? root.tempSlot
-        : (modelData.key === "ram" ? root.ramSlot : root.percentSlot)
+        : (modelData.key === "ram" ? 0 : root.percentSlot)
+      // Measured on the whole figure, zero-pad digit included.
       readonly property real slack: root.showValues
-        ? Math.max(0, group.figureSlot - valueText.implicitWidth - spacing)
+        ? Math.max(0, group.figureSlot - valueRow.implicitWidth - spacing)
         : 0
 
       readonly property bool isTempCell: modelData.key === "cpu-temp" || modelData.key === "gpu-temp"
@@ -694,6 +700,7 @@ Panel {
       }
 
       Row {
+        id: valueRow
         visible: root.showValues
         height: root.contentHeight
         spacing: 0
