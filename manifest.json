@@ -162,11 +162,11 @@
         "type": "enum",
         "label": "Top process metric",
         "options": [
-          "ram",
-          "cpu"
+          "cpu",
+          "ram"
         ],
         "defaultValue": "ram",
-        "description": "Sort top processes by RAM or CPU load."
+        "description": "Sort top processes by CPU load or RAM."
       },
       {
         "key": "topProcGroup",

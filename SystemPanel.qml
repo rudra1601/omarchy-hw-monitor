@@ -1421,19 +1421,19 @@ KeyboardPanel {
                 }
 
                 ModeChip {
-                  id: sortRamChip
-                  label: "RAM"
-                  selected: hw.topProcSort === "ram"
-                  anchors.verticalCenter: parent.verticalCenter
-                  onPicked: root.persistSetting("topProcSort", "ram")
-                }
-
-                ModeChip {
                   id: sortCpuChip
                   label: "CPU"
                   selected: hw.topProcSort === "cpu"
                   anchors.verticalCenter: parent.verticalCenter
                   onPicked: root.persistSetting("topProcSort", "cpu")
+                }
+
+                ModeChip {
+                  id: sortRamChip
+                  label: "RAM"
+                  selected: hw.topProcSort === "ram"
+                  anchors.verticalCenter: parent.verticalCenter
+                  onPicked: root.persistSetting("topProcSort", "ram")
                 }
 
                 ModeChip {
