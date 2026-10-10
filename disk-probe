@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# Lists mounted filesystems with their size, used and free bytes, plus the
+# block-device tree they sit on, as one JSON object:
+#
+#   {"local": <findmnt>, "network": <findmnt>|null, "networkTimedOut": bool,
+#    "blocks": <lsblk>}
+#
+# Model.parseDisks() does the filtering and grouping; this script only collects.
+# It runs only while the system panel is open (see Service.qml refreshDisks).
+#
+# Network filesystems get their own findmnt call under a hard timeout: statfs()
+# on an NFS share whose server is gone blocks until the mount gives up, and
+# that must not hold back the local disks. SIGKILL gets through the NFS wait
+# (it is TASK_KILLABLE) where SIGTERM may not.
+#
+# autofs placeholders are not listed (findmnt --real skips them), so an idle
+# systemd automount is never triggered just by opening the panel.
+#
+# Nothing here requires root, and nothing is written.
+
+set -uo pipefail
+
+NETWORK_TYPES="nfs,nfs4,cifs,smb3,smbfs,fuse.sshfs,fuse.rclone,9p,virtiofs,ceph,glusterfs,fuse.glusterfs,fuse.davfs2,davfs,afs"
+NETWORK_TIMEOUT=3
+COLUMNS=SOURCE,TARGET,FSTYPE,SIZE,USED,AVAIL,UUID,LABEL,OPTIONS
+
+mounts() {
+  findmnt --real --list --json --bytes -o "$COLUMNS" "$@" 2>/dev/null
+}
+
+local_json=$(mounts -t "no$NETWORK_TYPES")
+[[ -n $local_json ]] || local_json=null
+
+network_timed_out=false
+network_json=$(timeout -s KILL "$NETWORK_TIMEOUT" findmnt --real --list --json --bytes -o "$COLUMNS" -t "$NETWORK_TYPES" 2>/dev/null)
+status=$?
+# findmnt exits 1 when nothing matches; 137 is the SIGKILL from timeout.
+(( status == 137 )) && network_timed_out=true
+[[ -n $network_json ]] || network_json=null
+
+blocks_json=$(lsblk --list --json -o NAME,PATH,PKNAME,TYPE,MODEL,TRAN,RM,LABEL 2>/dev/null)
+[[ -n $blocks_json ]] || blocks_json=null
+
+printf '{"local": %s, "network": %s, "networkTimedOut": %s, "blocks": %s}\n' \
+  "$local_json" "$network_json" "$network_timed_out" "$blocks_json"

@@ -11,6 +11,8 @@ import "Model.js" as Model
 // the way a Waybar module would. Two documented exceptions fork helpers:
 // `nvidia-smi` on the sample interval (NVIDIA cards expose no sysfs telemetry)
 // and `proc_top.py` up to every 3 s, only while the system panel is open.
+// `disk-probe` (findmnt + lsblk) is the third, up to every 5 s, also only
+// while the panel is open.
 //
 // One instance exists per monitor, since the bar mounts a widget per screen.
 // The reads are cheap enough that this is not worth coordinating.
@@ -90,6 +92,15 @@ Item {
   // Veto anti-teardown: nessun handler tocca più lo stato dopo l'inizio
   // della distruzione (finestra di reload). Vedi onDestruction in fondo.
   property bool _destroyed: false
+
+  // Mounted filesystems for the panel's Storage section. Same rules as the
+  // top-process worker: sampled only while the panel is open, last good value
+  // kept on failure. null until the first probe lands.
+  property var disks: null
+  property bool disksFailed: false
+  property bool disksNetworkTimedOut: false
+  readonly property string diskProbePath: pluginDir + "/disk-probe"
+  property double _lastDiskTry: 0
 
   // Cumulative jiffies from the previous tick. CPU usage is the ratio between
   // two samples, so there is nothing to show until the second one lands.
@@ -217,6 +228,19 @@ Item {
     procTopProcess.command = cmd
     procTopProcess.running = true
     procTopWatchdog.restart()
+  }
+
+  // At most every 5 s; free space moves slowly. `force` skips the throttle,
+  // for opening the panel and the R key.
+  function refreshDisks(force) {
+    if (_destroyed || !active || !procPanelOpen || diskProcess.running) return
+    var now = Date.now()
+    if (!force && _lastDiskTry > 0 && now - _lastDiskTry < 5000) return
+    _lastDiskTry = now
+    // Through bash, not the shebang: a copy synced without the exec bit still runs.
+    diskProcess.command = ["/usr/bin/bash", diskProbePath]
+    diskProcess.running = true
+    diskWatchdog.restart()
   }
 
   // Cambio sort/raggruppamento → refresh immediato (throttle azzerato).
@@ -367,12 +391,51 @@ Item {
     }
   }
 
+  Process {
+    id: diskProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (root._destroyed) return
+        diskWatchdog.stop()
+        var res = Model.parseDisks(text)
+        if (res.ok) {
+          root.disks = res.disks
+          root.disksNetworkTimedOut = res.networkTimedOut
+          root.disksFailed = false
+        } else {
+          root.disksFailed = true
+        }
+      }
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: {
+      if (root._destroyed) return
+      diskWatchdog.stop()
+    }
+  }
+
+  // disk-probe bounds its own network call at 3 s; this only catches a local
+  // filesystem that hangs statfs(), which should never happen.
+  Timer {
+    id: diskWatchdog
+    interval: 6000
+    repeat: false
+    onTriggered: {
+      if (root._destroyed) return
+      if (diskProcess.running) diskProcess.running = false
+      root.disksFailed = true
+    }
+  }
+
   // Cleanup anti-teardown: ferma worker e watchdog e alza il veto, così
   // nessun callback in volo tocca lo stato durante la finalizzazione (reload).
   Component.onDestruction: {
     _destroyed = true
     procTopWatchdog.stop()
+    diskWatchdog.stop()
     if (procTopProcess.running) procTopProcess.running = false
+    if (diskProcess.running) diskProcess.running = false
     if (nvidiaProcess.running) nvidiaProcess.running = false
     if (probeProcess.running) probeProcess.running = false
   }

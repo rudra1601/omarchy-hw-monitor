@@ -12,8 +12,8 @@ import "Model.js" as Model
 // Right click walks the display modes and remembers the choice; middle click resamples.
 Panel {
   id: root
-  moduleName: "meviusisback.hw-monitor"
-  ipcTarget: "meviusisback.hw-monitor"
+  moduleName: "zoltanf.hw-monitor"
+  ipcTarget: "zoltanf.hw-monitor"
   manageIpc: false
 
   readonly property bool vertical: bar ? bar.vertical : false
@@ -68,6 +68,7 @@ Panel {
   readonly property bool showGpuTemp: boolSetting("showGpuTemp", false)
   readonly property bool showRam: boolSetting("showRam", true)
   readonly property bool showTopProcs: boolSetting("showTopProcs", true)
+  readonly property bool showDisks: boolSetting("showDisks", true)
 
   readonly property var itemOrder: {
     var raw = setting("itemsOrder", ["gpu", "cpu", "cpu-temp", "ram"])
@@ -108,6 +109,8 @@ Panel {
   readonly property int criticalPercent: intSetting("criticalPercent", 90, 1, 100)
   readonly property int warnTempC: intSetting("warnTempC", 75, 1, 150)
   readonly property int criticalTempC: intSetting("criticalTempC", 90, 1, 150)
+  readonly property int diskWarnPercent: intSetting("diskWarnPercent", 80, 1, 100)
+  readonly property int diskCriticalPercent: intSetting("diskCriticalPercent", 95, 1, 100)
 
   readonly property string clickCommand: String(setting("clickCommand", ""))
 
@@ -486,7 +489,7 @@ Panel {
   }
 
   IpcHandler {
-    target: "meviusisback.hw-monitor"
+    target: "zoltanf.hw-monitor"
 
     function open(): void { root.open() }
     function close(): void { root.close() }
@@ -566,6 +569,7 @@ Panel {
     showGpuTemp: root.showGpuTemp
     showRam: root.showRam
     showTopProcs: root.showTopProcs
+    showDisks: root.showDisks
     showClocks: root.showClocks
     showGauges: root.showGauges
     ramFormat: root.ramFormat
@@ -575,6 +579,8 @@ Panel {
     criticalPercent: root.criticalPercent
     warnTempC: root.warnTempC
     criticalTempC: root.criticalTempC
+    diskWarnPercent: root.diskWarnPercent
+    diskCriticalPercent: root.diskCriticalPercent
   }
 
   // A component group: glyph + figure (+ temp)

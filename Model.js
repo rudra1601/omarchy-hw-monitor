@@ -280,6 +280,157 @@ function parseProcTop(raw, maxN) {
   return out
 }
 
+// ------------------------------------------------------------------ storage
+//
+// disk-probe prints {"local", "network", "networkTimedOut", "blocks"}, the
+// first two straight from `findmnt --json --bytes`, the last from
+// `lsblk --json`. Returns {ok, disks, networkTimedOut}; each disk is one
+// filesystem, however many places it is mounted.
+
+var DISK_SKIP_SOURCE = /^\/dev\/(loop|zram|ram)\d/
+
+// btrfs subvolumes show as "/dev/mapper/root[/@home]"; the device is the part
+// before the bracket.
+function diskDevice(source) {
+  return String(source || "").replace(/\[.*\]$/, "")
+}
+
+// Short name for the panel row: the mount point, except desktop automounts
+// (/run/media/<user>/<name>, /media/<name>), which read better as the name.
+function diskTitle(target, label) {
+  var t = String(target || "")
+  var auto = t.match(/^\/run\/media\/[^\/]+\/(.+)$/) || t.match(/^\/media\/(?:[^\/]+\/)?(.+)$/)
+  if (auto) return label ? String(label) : auto[1]
+  return t
+}
+
+// Walk lsblk's parent chain (partition → crypt/LVM → disk) for the physical
+// disk's model and whether it is removable.
+function diskHardware(device, blocks) {
+  var byPath = {}
+  var byName = {}
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i]
+    if (!b || typeof b !== "object") continue
+    if (b.path) byPath[String(b.path)] = b
+    if (b.name) byName[String(b.name)] = b
+  }
+
+  var info = { model: "", removable: false, transport: "" }
+  var node = byPath[device] || null
+  for (var hops = 0; node && hops < 8; hops++) {
+    if (node.model && !info.model) info.model = String(node.model).trim()
+    if (node.tran && !info.transport) info.transport = String(node.tran)
+    if (node.rm === true || node.tran === "usb" || /^mmcblk/.test(String(node.name || ""))) info.removable = true
+    node = node.pkname ? byName[String(node.pkname)] || null : null
+  }
+  return info
+}
+
+function parseDisks(raw) {
+  var out = { ok: false, disks: [], networkTimedOut: false }
+  var text = String(raw || "").trim()
+  if (text === "") return out
+  var parsed = null
+  try {
+    parsed = JSON.parse(text)
+  } catch (e) {
+    return out
+  }
+  if (!parsed || typeof parsed !== "object") return out
+
+  var blocks = parsed.blocks && parsed.blocks.blockdevices instanceof Array ? parsed.blocks.blockdevices : []
+  var groups = {}
+  var order = []
+
+  function collect(list, network) {
+    if (!(list instanceof Array)) return
+    for (var i = 0; i < list.length; i++) {
+      var fs = list[i]
+      if (!fs || typeof fs !== "object") continue
+      var source = String(fs.source || "")
+      var size = toNumber(fs.size, -1)
+      if (size <= 0) continue
+      if (!network && (source.indexOf("/dev/") !== 0 || DISK_SKIP_SOURCE.test(source))) continue
+
+      var device = network ? source : diskDevice(source)
+      var key = !network && fs.uuid ? "uuid:" + fs.uuid : "dev:" + device
+      var target = String(fs.target || "")
+      var group = groups[key]
+      if (!group) {
+        group = groups[key] = {
+          key: key,
+          device: device,
+          fstype: String(fs.fstype || ""),
+          label: fs.label ? String(fs.label) : "",
+          kind: network ? "network" : "internal",
+          readOnly: false,
+          targets: [],
+          sizeBytes: size,
+          usedBytes: Math.max(0, toNumber(fs.used, 0)),
+          availBytes: Math.max(0, toNumber(fs.avail, 0))
+        }
+        order.push(key)
+      }
+      group.targets.push(target)
+      if (/(^|,)ro(,|$)/.test(String(fs.options || ""))) group.readOnly = true
+    }
+  }
+
+  collect(parsed.local && parsed.local.filesystems, false)
+  collect(parsed.network && parsed.network.filesystems, true)
+
+  var rank = { internal: 0, removable: 1, network: 2 }
+  for (var k = 0; k < order.length; k++) {
+    var g = groups[order[k]]
+    // The shortest mount point names the filesystem: "/" rather than "/home".
+    g.targets.sort(function(a, b) { return a.length - b.length || (a < b ? -1 : 1) })
+    g.target = g.targets[0]
+    g.title = diskTitle(g.target, g.label)
+    g.extraMounts = g.targets.length - 1
+
+    g.model = ""
+    g.transport = ""
+    if (g.kind !== "network") {
+      var info = diskHardware(g.device, blocks)
+      g.model = info.model
+      g.transport = info.transport
+      if (info.removable) g.kind = "removable"
+    }
+
+    // Percent as df reports it: against what non-root users can actually use,
+    // so a disk at 100% really is full even with root-reserved blocks left.
+    var usable = g.usedBytes + g.availBytes
+    g.percent = usable > 0 ? clamp(100 * g.usedBytes / usable, 0, 100) : -1
+    out.disks.push(g)
+  }
+
+  out.disks.sort(function(a, b) {
+    if (rank[a.kind] !== rank[b.kind]) return rank[a.kind] - rank[b.kind]
+    if (a.target === "/") return -1
+    if (b.target === "/") return 1
+    return a.target < b.target ? -1 : (a.target > b.target ? 1 : 0)
+  })
+  out.networkTimedOut = parsed.networkTimedOut === true
+  out.ok = true
+  return out
+}
+
+// Binary units like df -h, with the unit spelled out to match the GiB used
+// elsewhere in the panel: "1.8 GiB", "205 GiB", "3.6 TiB".
+function formatBytes(bytes) {
+  if (!isFinite(bytes) || bytes < 0) return "–"
+  var units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+  var value = bytes
+  var i = 0
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024
+    i++
+  }
+  var figure = i === 0 || value >= 10 ? String(Math.round(value)) : value.toFixed(1)
+  return figure + " " + units[i]
+}
+
 // ------------------------------------------------------------------ severity
 //
 // 0 while a reading is unremarkable, ramping to 1 as it crosses from `warn` to

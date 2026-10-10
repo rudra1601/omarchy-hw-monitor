@@ -18,6 +18,8 @@ KeyboardPanel {
   property int criticalPercent: 90
   property int warnTempC: 75
   property int criticalTempC: 90
+  property int diskWarnPercent: 80
+  property int diskCriticalPercent: 95
 
   property string mode: "icons"
   property bool showGpu: true
@@ -26,6 +28,7 @@ KeyboardPanel {
   property bool showGpuTemp: false
   property bool showRam: true
   property bool showTopProcs: true
+  property bool showDisks: true
   property bool showClocks: false
   property bool showGauges: false
   property string ramFormat: "used/total"
@@ -119,6 +122,7 @@ KeyboardPanel {
       hw.sample()
       hw.procPanelOpen = true
       hw.refreshProcTop()
+      hw.refreshDisks(true)
       var initial = hw.cpuPercent >= 0 ? hw.cpuPercent : 0
       root.cpuHistory = [initial, initial]
     } else {
@@ -146,6 +150,7 @@ KeyboardPanel {
     onTextKey: function(t) {
       if (t === "r" || t === "R") {
         hw.sample()
+        hw.refreshDisks(true)
       } else if (t === "c" || t === "C" || t === "f" || t === "F") {
         root.toggleFahrenheit()
       } else if (t === "s" || t === "S") {
@@ -161,6 +166,7 @@ KeyboardPanel {
       onTriggered: {
         hw.sample()
         hw.refreshProcTop()
+        hw.refreshDisks(false)
         var cur = hw.cpuPercent >= 0 ? hw.cpuPercent : 0
         var arr = root.cpuHistory.slice()
         arr.push(cur)
@@ -943,6 +949,176 @@ KeyboardPanel {
           }
         }
 
+        // 5a. Storage: every mounted disk, removable drive and network share
+        // (only while the panel is open)
+        Rectangle {
+          width: parent.width
+          implicitHeight: diskCol.implicitHeight + Style.space(24)
+          color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
+          border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
+          border.width: 1
+          radius: Style.cornerRadius
+          id: storageCard
+          visible: root.showDisks
+
+          readonly property var diskList: hw.disks || []
+
+          Column {
+            id: diskCol
+            anchors.fill: parent
+            anchors.margins: Style.space(12)
+            spacing: Style.space(10)
+
+            Row {
+              width: parent.width
+              spacing: Style.space(6)
+
+              Text {
+                id: diskHeadIcon
+                textFormat: Text.PlainText
+                text: "󰋊"
+                color: Color.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                id: diskHeadTitle
+                textFormat: Text.PlainText
+                text: "Storage"
+                color: root.baseColor
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Item {
+                width: Math.max(0, parent.width - diskHeadIcon.implicitWidth - diskHeadTitle.implicitWidth - diskHeadCount.implicitWidth - parent.spacing * 3)
+                height: 1
+              }
+
+              Text {
+                id: diskHeadCount
+                textFormat: Text.PlainText
+                text: storageCard.diskList.length > 0 ? storageCard.diskList.length + " mounted" : ""
+                color: Qt.darker(root.baseColor, 1.4)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+
+            Repeater {
+              model: storageCard.diskList
+              delegate: Column {
+                required property var modelData
+
+                width: parent.width
+                spacing: Style.space(4)
+
+                readonly property color fillColor: root.warm(root.baseColor,
+                  Model.severity(modelData.percent, root.diskWarnPercent, root.diskCriticalPercent))
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Text {
+                    id: diskKind
+                    textFormat: Text.PlainText
+                    text: modelData.kind === "network" ? "󰒍" : (modelData.kind === "removable" ? "󰕓" : "󰋊")
+                    color: Qt.darker(root.baseColor, 1.4)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    width: Math.max(40, parent.width - diskKind.implicitWidth - diskFigs.implicitWidth - parent.spacing * 2)
+                    elide: Text.ElideMiddle
+                    text: modelData.title
+                    color: root.baseColor
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Text {
+                    id: diskFigs
+                    textFormat: Text.PlainText
+                    text: Model.formatBytes(modelData.availBytes) + " free of " + Model.formatBytes(modelData.sizeBytes)
+                    color: fillColor
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(6)
+                  radius: height / 2
+                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.12)
+
+                  Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    radius: parent.radius
+                    color: fillColor
+                    width: modelData.percent >= 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (modelData.percent / 100))) : 0
+                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                  }
+                }
+
+                Text {
+                  textFormat: Text.PlainText
+                  width: parent.width
+                  elide: Text.ElideRight
+                  text: {
+                    var parts = [modelData.model || modelData.device, modelData.fstype]
+                    if (modelData.readOnly) parts.push("read-only")
+                    if (modelData.extraMounts > 0) parts.push("+" + modelData.extraMounts + (modelData.extraMounts === 1 ? " mount" : " mounts"))
+                    if (modelData.percent >= 0) parts.push(Math.round(modelData.percent) + "% used")
+                    return parts.join(" · ")
+                  }
+                  color: Qt.darker(root.baseColor, 1.4)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: hw.disksNetworkTimedOut
+              width: parent.width
+              wrapMode: Text.Wrap
+              text: "A network share did not answer within 3 s and is left out."
+              color: Qt.darker(root.baseColor, 1.4)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: storageCard.diskList.length === 0
+              width: parent.width
+              wrapMode: Text.Wrap
+              text: hw.disksFailed ? "Storage data unavailable (findmnt failed)." : (hw.disks === null ? "Reading mounted filesystems…" : "No mounted storage.")
+              color: Qt.darker(root.baseColor, 1.4)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+        }
+
         // 5b. Top Processes by RAM (only while the panel is open)
         Rectangle {
           width: parent.width
@@ -976,7 +1152,7 @@ KeyboardPanel {
 
               Text {
                 textFormat: Text.PlainText
-                text: "Top processi"
+                text: "Top processes"
                 color: root.baseColor
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -1002,7 +1178,7 @@ KeyboardPanel {
 
               ModeChip {
                 id: groupChip
-                label: "Raggruppa"
+                label: "Group"
                 selected: hw.topProcGroup
                 anchors.verticalCenter: parent.verticalCenter
                 onPicked: root.persistSetting("topProcGroup", !hw.topProcGroup)
@@ -1017,7 +1193,7 @@ KeyboardPanel {
                 id: procTopStamp
                 textFormat: Text.PlainText
                 text: {
-                  var metric = hw.topProcSort === "cpu" ? "per CPU" : "per RAM"
+                  var metric = hw.topProcSort === "cpu" ? "by CPU" : "by RAM"
                   if (hw.procTopTime === "") return metric
                   return metric + " \u00b7 " + hw.procTopTime
                 }
@@ -1074,7 +1250,7 @@ KeyboardPanel {
                       textFormat: Text.PlainText
                       width: Math.max(40, parent.width - procRank.implicitWidth - procFigs.implicitWidth - parent.spacing * 2)
                       elide: Text.ElideRight
-                      text: modelData.count > 1 ? (modelData.name + "  \u00b7 " + modelData.count + " processi") : (modelData.name + "  (" + modelData.pid + ")")
+                      text: modelData.count > 1 ? (modelData.name + "  \u00b7 " + modelData.count + " processes") : (modelData.name + "  (" + modelData.pid + ")")
                       color: root.baseColor
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
@@ -1118,7 +1294,7 @@ KeyboardPanel {
               visible: hw.topProcs.length === 0
               width: parent.width
               wrapMode: Text.Wrap
-              text: hw.procTopFailed ? "Dati processi non disponibili (python3 assente o lettura fallita)." : "Raccolta dati processi\u2026"
+              text: hw.procTopFailed ? "Process data unavailable (python3 missing or read failed)." : "Collecting process data\u2026"
               color: Qt.darker(root.baseColor, 1.4)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption

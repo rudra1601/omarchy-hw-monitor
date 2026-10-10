@@ -1,12 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/omarchy/omarchy/main/schemas/plugin.json",
   "schemaVersion": 1,
-  "id": "meviusisback.hw-monitor",
-  "name": "Hardware Monitor",
-  "version": "1.2.0",
-  "author": "meviusisback (original by Edgar Silva)",
+  "id": "zoltanf.hw-monitor",
+  "name": "Hardware Monitor + Storage",
+  "version": "1.2.0+storage.1",
+  "author": "zoltanf (fork of meviusisback/omarchy-hw-monitor; original by Edgar Silva)",
   "license": "MIT",
-  "description": "GPU, CPU, temperature, and RAM in the bar as sleek icon + figure readouts, with a first-class visual system panel including top processes by RAM.",
+  "description": "GPU, CPU, temperature, and RAM in the bar as sleek icon + figure readouts, with a first-class visual system panel including top processes by RAM and free space on every mounted disk and share.",
   "repository": "https://github.com/meviusisback/omarchy-hw-monitor",
   "kinds": [
     "bar-widget"
@@ -15,8 +15,8 @@
     "barWidget": "Widget.qml"
   },
   "barWidget": {
-    "displayName": "Hardware Monitor",
-    "description": "GPU, CPU, temperature, and RAM load as sleek icon readouts, vertical gauges, or spelled out words. Left click opens the system telemetry panel with top processes by RAM.",
+    "displayName": "Hardware Monitor + Storage",
+    "description": "GPU, CPU, temperature, and RAM load as sleek icon readouts, vertical gauges, or spelled out words. Left click opens the system telemetry panel with top processes by RAM and free space per mounted disk, removable drive and network share.",
     "category": "System",
     "allowMultiple": true,
     "defaultSection": "right",
@@ -38,6 +38,7 @@
       "topProcCount": 6,
       "topProcSort": "ram",
       "topProcGroup": true,
+      "showDisks": true,
       "showGauges": true,
       "showValues": false,
       "showClocks": false,
@@ -50,6 +51,8 @@
       "criticalPercent": 90,
       "warnTempC": 75,
       "criticalTempC": 90,
+      "diskWarnPercent": 80,
+      "diskCriticalPercent": 95,
       "gpuIcon": "\udb83\udfb2",
       "cpuIcon": "\uf4bc",
       "tempIcon": "\uf2c9",
@@ -150,6 +153,13 @@
         "label": "Group by application",
         "defaultValue": true,
         "description": "Collapse processes by application (systemd scope, comm-name fallback) with summed RAM/CPU and process counts."
+      },
+      {
+        "key": "showDisks",
+        "type": "boolean",
+        "label": "Show storage",
+        "defaultValue": true,
+        "description": "Show free space for every mounted disk, removable drive and network share in the system panel (sampled only while the panel is open; idle automounts are not triggered)."
       },
       {
         "key": "ramFormat",
@@ -310,6 +320,24 @@
         "max": 150,
         "step": 1,
         "defaultValue": 90
+      },
+      {
+        "key": "diskWarnPercent",
+        "type": "integer",
+        "label": "Warning disk use (%)",
+        "min": 1,
+        "max": 100,
+        "step": 1,
+        "defaultValue": 80
+      },
+      {
+        "key": "diskCriticalPercent",
+        "type": "integer",
+        "label": "Critical disk use (%)",
+        "min": 1,
+        "max": 100,
+        "step": 1,
+        "defaultValue": 95
       },
       {
         "key": "gpu",

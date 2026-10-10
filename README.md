@@ -1,5 +1,12 @@
 # Hardware Monitor — Omarchy bar widget & system panel
 
+> **Fork:** `zoltanf.hw-monitor`, based on
+> [meviusisback/omarchy-hw-monitor](https://github.com/meviusisback/omarchy-hw-monitor)
+> 1.2.0. It adds a **Storage** section to the system panel (free space per
+> mounted disk, removable drive and network share) and puts the top-processes
+> section's Italian strings into English. The bar readout is unchanged.
+> Everywhere below, read `zoltanf.hw-monitor` for `meviusisback.hw-monitor`.
+
 Memory, CPU, and GPU in the bar, with a first-class visual system panel popup. Four readouts, cycled with a right click: sleek icon groups (Noctalia-style), gauges alone, gauges with temperatures, or the numbers spelled out.
 
 ![The system panel, anchored under the bar readout](preview.png)
@@ -7,7 +14,8 @@ Memory, CPU, and GPU in the bar, with a first-class visual system panel popup. F
 Bar sampling reads `/proc` and `/sys` inside the shell process via `FileView` —
 no polling script on a timer for that. Two documented helpers do fork: `nvidia-smi`
 on the sample interval (NVIDIA cards only — they expose no sysfs telemetry) and
-`proc_top.py` up to every 3 s, but only while the system panel is open.
+`proc_top.py` up to every 3 s, and `disk-probe` up to every 5 s, both only
+while the system panel is open.
 
 ## Install
 
@@ -40,7 +48,8 @@ Clicking the widget opens an Omarchy keyboard-driven popup panel anchored to the
 - **60s CPU load sparkline** — live history trend buffer sampled while open (zero background cost when closed).
 - **Processor details** — full CPU model name (without cutoff), load, clock frequency, dynamic temperature color, and 1m/5m/15m load average meters.
 - **Memory breakdown** — used/total GiB visual meter, available, cache, and swap usage.
-- **Top processi** — i processi principali ordinati per RAM o CPU (switch nell'header), con quota e CPU% per processo, barre in rampa blu verso l'accent del tema. Il toggle Raggruppa li collassa per applicazione (scope systemd, fallback per nome) con conteggi e somme. Campionati solo a pannello aperto (zero costo a pannello chiuso).
+- **Storage** — one row per mounted filesystem: internal disks, removable drives and network shares (NFS, SMB, sshfs, rclone), each with a used-space bar, free of total, the disk model or share source, and the filesystem type. A filesystem mounted in several places (btrfs subvolumes) is one row, named after its shortest mount point. Idle automounts are not triggered, and a network share that does not answer within 3 s is left out rather than holding up the rest. Sampled only while the panel is open.
+- **Top processes** — the heaviest processes by RAM or CPU (switch in the header), with share and CPU% per process, bars ramping toward the theme accent. The Group toggle collapses them by application (systemd scope, name fallback) with counts and sums. Sampled only while the panel is open (zero cost when closed).
 - **Graphics metrics** — full GPU card name, load, dynamic temperature color, VRAM meter, power draw (W), fan RPM, and clock speeds.
 - **Keyboard navigation** — `Escape` to close, `Tab`/`Shift+Tab` to switch panels, `r` to resample, `c`/`f` to toggle °C/°F.
 
@@ -74,6 +83,7 @@ label welded to its figure, ~230px.
 | CPU temperature | `hwmon` | die/package sensor, picked by scoring (`k10temp` `Tdie`/`Tctl`, `coretemp` `Package id 0`, `zenpower`, ThinkPad, ARM SoC, then `acpitz`) |
 | GPU | the card's own `sysfs` | load, edge temperature, VRAM, board power, fan, core clock |
 | Load average | `/proc/loadavg` | 1/5/15 minute |
+| Storage | `findmnt` + `lsblk`, via [`disk-probe`](disk-probe) | size, used and available per mounted filesystem (percent as `df` computes it), disk model, removable or network |
 
 An NVIDIA card is the exception: it reports none of this through sysfs, so it is
 polled through `nvidia-smi` on the same interval.
@@ -86,8 +96,8 @@ script, because working out *which* files a machine exposes means globbing
 After that the resolved sysfs/`/proc` paths need no fork on a timer the way a
 Waybar custom module does: the widget reads them directly with `FileView`, which
 is what makes a two-second interval reasonable for something that runs for the
-life of your session. The documented exceptions are `nvidia-smi` (NVIDIA cards)
-and `proc_top.py` (open panel only).
+life of your session. The documented exceptions are `nvidia-smi` (NVIDIA cards),
+`proc_top.py` and `disk-probe` (open panel only).
 
 `blockAllReads` is set on those views deliberately. Without it `reload()` is
 asynchronous and `text()` returns the *previous* tick's contents, so every
@@ -145,6 +155,7 @@ omarchy bar set meviusisback.hw-monitor fahrenheit true --json
 | `topProcCount` | int | `6` | How many rows to list (3–12, sorted by the active metric). |
 | `topProcSort` | enum | `ram` | Sort top processes by `ram` or `cpu` (switchable in the panel header). |
 | `topProcGroup` | bool | `true` | Collapse processes by application (systemd scope, name fallback) with counts and summed figures. |
+| `showDisks` | bool | `true` | Show the Storage section in the system panel (sampled only while open). |
 | `ramFormat` | string | `"used/total"` | `"used/total"` (`12/23G`), `"used"` (`12.3G`), `"percent"` (`52%`), `"free"` (`11.1G`), or `"available"` (`11.1G`). |
 | `tempFormat` | string | `"degree-unit"` | `"degree-unit"` (`45°C`), `"degree"` (`45°`), `"unit"` (`45C`), `"unit-lower"` (`45c`), or `"bare"` (`45`). |
 | `fahrenheit` | bool | `false` | Temperatures in °F instead of °C. |
@@ -165,6 +176,8 @@ omarchy bar set meviusisback.hw-monitor fahrenheit true --json
 | `criticalPercent` | int | `90` | Load threshold where the gauge glows and color reaches full urgent. |
 | `warnTempC` | int | `75` | Temperature threshold (°C) where figures warm toward urgent. |
 | `criticalTempC` | int | `90` | Temperature threshold (°C) where temperature turns hot urgent red. |
+| `diskWarnPercent` | int | `80` | Disk use (%) where a Storage row starts warming toward urgent. |
+| `diskCriticalPercent` | int | `95` | Disk use (%) where a Storage row reaches full urgent. |
 | `clickCommand` | string | `""` | Command to run on left click. Empty opens the built-in system panel popup. |
 | `monitors` | array/string | `[]` | Connector names to draw on (e.g. `["DP-1"]`). Empty draws on all screens. |
 
