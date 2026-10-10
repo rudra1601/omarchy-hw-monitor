@@ -3,11 +3,11 @@
   "schemaVersion": 1,
   "id": "zoltanf.hw-monitor",
   "name": "Hardware Monitor + Storage",
-  "version": "1.2.0+storage.1",
+  "version": "1.2.0+storage.2",
   "author": "zoltanf (fork of meviusisback/omarchy-hw-monitor; original by Edgar Silva)",
   "license": "MIT",
   "description": "GPU, CPU, temperature, and RAM in the bar as sleek icon + figure readouts, with a first-class visual system panel including top processes by RAM and free space on every mounted disk and share.",
-  "repository": "https://github.com/meviusisback/omarchy-hw-monitor",
+  "repository": "https://github.com/zoltanf/omarchy-hw-monitor",
   "kinds": [
     "bar-widget"
   ],
@@ -39,6 +39,27 @@
       "topProcSort": "ram",
       "topProcGroup": true,
       "showDisks": true,
+      "diskHideMounts": [
+        "/boot",
+        "/boot/efi",
+        "/efi"
+      ],
+      "panelSections": [
+        "dials",
+        "history",
+        "processor",
+        "memory",
+        "storage",
+        "procs",
+        "gpu"
+      ],
+      "panelSectionsHidden": [],
+      "panelDials": [
+        "cpu",
+        "ram",
+        "gpu"
+      ],
+      "panelDialsHidden": [],
       "showGauges": true,
       "showValues": false,
       "showClocks": false,
@@ -160,6 +181,41 @@
         "label": "Show storage",
         "defaultValue": true,
         "description": "Show free space for every mounted disk, removable drive and network share in the system panel (sampled only while the panel is open; idle automounts are not triggered)."
+      },
+      {
+        "key": "diskHideMounts",
+        "type": "string",
+        "label": "Storage: hidden mount points",
+        "defaultValue": "/boot,/boot/efi,/efi",
+        "description": "Comma-separated mount points left out of the Storage section. The EFI system partition is hidden by default."
+      },
+      {
+        "key": "panelSections",
+        "type": "string",
+        "label": "Panel section order",
+        "defaultValue": "dials,history,processor,memory,storage,procs,gpu",
+        "description": "Order of the system panel sections, comma-separated. Missing ones are appended. Easier from the panel's gear settings."
+      },
+      {
+        "key": "panelSectionsHidden",
+        "type": "string",
+        "label": "Hidden panel sections",
+        "defaultValue": "",
+        "description": "Comma-separated panel sections to hide (dials, history, processor, memory, storage, procs, gpu)."
+      },
+      {
+        "key": "panelDials",
+        "type": "string",
+        "label": "Panel dial order",
+        "defaultValue": "cpu,ram,gpu",
+        "description": "Order of the round dials at the top of the panel, comma-separated."
+      },
+      {
+        "key": "panelDialsHidden",
+        "type": "string",
+        "label": "Hidden panel dials",
+        "defaultValue": "",
+        "description": "Comma-separated dials to hide (cpu, ram, gpu)."
       },
       {
         "key": "ramFormat",

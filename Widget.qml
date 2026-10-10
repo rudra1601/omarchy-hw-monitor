@@ -77,6 +77,14 @@ Panel {
     return text === "" ? ["gpu", "cpu", "cpu-temp", "ram"] : text.split(/[,\s]+/)
   }
 
+  // Every orderable list in full, for the panel's settings drawer.
+  readonly property var barOrder: Model.normalizeOrder(itemOrder, Model.BAR_ITEMS)
+  readonly property var panelSections: Model.normalizeOrder(setting("panelSections", []), Model.PANEL_SECTIONS)
+  readonly property var panelSectionsHidden: Model.keyList(setting("panelSectionsHidden", []))
+  readonly property var panelDials: Model.normalizeOrder(setting("panelDials", []), Model.PANEL_DIALS)
+  readonly property var panelDialsHidden: Model.keyList(setting("panelDialsHidden", []))
+  readonly property var diskHideMounts: Model.stringList(setting("diskHideMounts", Model.DISK_HIDE_DEFAULT))
+
   // ------------------------------------------------------------ formatting
 
   readonly property bool fahrenheit: boolSetting("fahrenheit", false)
@@ -455,10 +463,18 @@ Panel {
   }
 
   function persistSetting(key, value) {
+    var changes = {}
+    changes[key] = value
+    persistSettings(changes)
+  }
+
+  // Several keys in one write, so a toggle that touches two settings does not
+  // race its own first half.
+  function persistSettings(changes) {
     var live = currentEntry()
     var entry = { id: root.moduleName }
     for (var k in live) if (k !== "id") entry[k] = live[k]
-    entry[key] = value
+    for (var c in changes) entry[c] = changes[c]
     root.settings = entry
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function") {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
@@ -570,6 +586,12 @@ Panel {
     showRam: root.showRam
     showTopProcs: root.showTopProcs
     showDisks: root.showDisks
+    barOrder: root.barOrder
+    sectionOrder: root.panelSections
+    sectionsHidden: root.panelSectionsHidden
+    dialOrder: root.panelDials
+    dialsHidden: root.panelDialsHidden
+    diskHideMounts: root.diskHideMounts
     showClocks: root.showClocks
     showGauges: root.showGauges
     ramFormat: root.ramFormat

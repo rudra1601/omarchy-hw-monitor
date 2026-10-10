@@ -2,9 +2,14 @@
 
 > **Fork:** `zoltanf.hw-monitor`, based on
 > [meviusisback/omarchy-hw-monitor](https://github.com/meviusisback/omarchy-hw-monitor)
-> 1.2.0. It adds a **Storage** section to the system panel (free space per
-> mounted disk, removable drive and network share) and puts the top-processes
-> section's Italian strings into English. The bar readout is unchanged.
+> 1.2.0. It adds:
+>
+> - a **Storage** section in the system panel: free space per mounted disk,
+>   removable drive and network share (`/boot` and other EFI mounts hidden);
+> - **layout controls** in the panel's gear settings: reorder and show/hide
+>   the bar items, the panel dials and the panel sections;
+> - English strings for the top-processes section.
+>
 > Everywhere below, read `zoltanf.hw-monitor` for `meviusisback.hw-monitor`.
 
 Memory, CPU, and GPU in the bar, with a first-class visual system panel popup. Four readouts, cycled with a right click: sleek icon groups (Noctalia-style), gauges alone, gauges with temperatures, or the numbers spelled out.
@@ -20,7 +25,7 @@ while the system panel is open.
 ## Install
 
 ```sh
-omarchy plugin add https://github.com/meviusisback/omarchy-hw-monitor.git --enable
+omarchy plugin add https://github.com/zoltanf/omarchy-hw-monitor.git --enable
 ```
 
 Then place it where you want it and restart the shell:
@@ -51,6 +56,7 @@ Clicking the widget opens an Omarchy keyboard-driven popup panel anchored to the
 - **Storage** — one row per mounted filesystem: internal disks, removable drives and network shares (NFS, SMB, sshfs, rclone), each with a used-space bar, free of total, the disk model or share source, and the filesystem type. A filesystem mounted in several places (btrfs subvolumes) is one row, named after its shortest mount point. Idle automounts are not triggered, and a network share that does not answer within 3 s is left out rather than holding up the rest. Sampled only while the panel is open.
 - **Top processes** — the heaviest processes by RAM or CPU (switch in the header), with share and CPU% per process, bars ramping toward the theme accent. The Group toggle collapses them by application (systemd scope, name fallback) with counts and sums. Sampled only while the panel is open (zero cost when closed).
 - **Graphics metrics** — full GPU card name, load, dynamic temperature color, VRAM meter, power draw (W), fan RPM, and clock speeds.
+- **Layout (gear settings)** — *Items* orders the bar readouts, *Dials* the round gauges at the top of the panel, *Sections* the panel's cards. `‹ ›` / `↑ ↓` move an entry; clicking its name shows or hides it. Saved to the widget's `shell.json` entry like every other setting.
 - **Keyboard navigation** — `Escape` to close, `Tab`/`Shift+Tab` to switch panels, `r` to resample, `c`/`f` to toggle °C/°F.
 
 ### The four bar readouts
@@ -156,6 +162,11 @@ omarchy bar set meviusisback.hw-monitor fahrenheit true --json
 | `topProcSort` | enum | `ram` | Sort top processes by `ram` or `cpu` (switchable in the panel header). |
 | `topProcGroup` | bool | `true` | Collapse processes by application (systemd scope, name fallback) with counts and summed figures. |
 | `showDisks` | bool | `true` | Show the Storage section in the system panel (sampled only while open). |
+| `diskHideMounts` | array/string | `["/boot", "/boot/efi", "/efi"]` | Mount points left out of the Storage section. |
+| `panelSections` | array/string | `dials,history,processor,memory,storage,procs,gpu` | Order of the panel sections. Missing ones are appended, so new sections never vanish. |
+| `panelSectionsHidden` | array/string | `[]` | Panel sections to hide. |
+| `panelDials` | array/string | `cpu,ram,gpu` | Order of the round dials at the top of the panel. |
+| `panelDialsHidden` | array/string | `[]` | Dials to hide. |
 | `ramFormat` | string | `"used/total"` | `"used/total"` (`12/23G`), `"used"` (`12.3G`), `"percent"` (`52%`), `"free"` (`11.1G`), or `"available"` (`11.1G`). |
 | `tempFormat` | string | `"degree-unit"` | `"degree-unit"` (`45°C`), `"degree"` (`45°`), `"unit"` (`45C`), `"unit-lower"` (`45c`), or `"bare"` (`45`). |
 | `fahrenheit` | bool | `false` | Temperatures in °F instead of °C. |

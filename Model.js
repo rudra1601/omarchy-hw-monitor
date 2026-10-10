@@ -416,6 +416,16 @@ function parseDisks(raw) {
   return out
 }
 
+// Mount points left out of the Storage section unless the user says otherwise:
+// the EFI system partition is a few hundred MB that only the bootloader uses.
+var DISK_HIDE_DEFAULT = ["/boot", "/boot/efi", "/efi"]
+
+function visibleDisks(disks, hiddenMounts) {
+  if (!(disks instanceof Array)) return []
+  var hidden = hiddenMounts instanceof Array ? hiddenMounts : []
+  return disks.filter(function(d) { return hidden.indexOf(d.target) === -1 })
+}
+
 // Binary units like df -h, with the unit spelled out to match the GiB used
 // elsewhere in the panel: "1.8 GiB", "205 GiB", "3.6 TiB".
 function formatBytes(bytes) {
@@ -429,6 +439,64 @@ function formatBytes(bytes) {
   }
   var figure = i === 0 || value >= 10 ? String(Math.round(value)) : value.toFixed(1)
   return figure + " " + units[i]
+}
+
+// ---------------------------------------------------------------- ordering
+//
+// The bar items, the panel dials and the panel sections are each an ordered
+// list of known keys, stored in shell.json as an array (a comma-separated
+// string is accepted too, as `itemsOrder` always has been). Whatever the
+// stored list leaves out is appended in default order, so a section added in a
+// later version shows up instead of vanishing.
+
+var BAR_ITEMS = ["gpu", "cpu", "cpu-temp", "gpu-temp", "ram"]
+var PANEL_DIALS = ["cpu", "ram", "gpu"]
+var PANEL_SECTIONS = ["dials", "history", "processor", "memory", "storage", "procs", "gpu"]
+
+// Case is kept: mount points are case-sensitive.
+function stringList(raw) {
+  if (raw === undefined || raw === null) return []
+  var items = raw instanceof Array ? raw : String(raw).split(/[,\s]+/)
+  var out = []
+  for (var i = 0; i < items.length; i++) {
+    var s = String(items[i] === undefined || items[i] === null ? "" : items[i]).trim()
+    if (s !== "") out.push(s)
+  }
+  return out
+}
+
+function keyList(raw) {
+  return stringList(raw).map(function(s) { return s.toLowerCase() })
+}
+
+function normalizeOrder(raw, known) {
+  var out = []
+  var wanted = keyList(raw)
+  for (var i = 0; i < wanted.length; i++) {
+    if (known.indexOf(wanted[i]) !== -1 && out.indexOf(wanted[i]) === -1) out.push(wanted[i])
+  }
+  for (var j = 0; j < known.length; j++) {
+    if (out.indexOf(known[j]) === -1) out.push(known[j])
+  }
+  return out
+}
+
+// Swap `key` with its neighbour `delta` places away; ends do not wrap.
+function moveKey(order, key, delta) {
+  var out = order.slice()
+  var from = out.indexOf(key)
+  var to = from + delta
+  if (from === -1 || to < 0 || to >= out.length) return out
+  out[from] = out[to]
+  out[to] = key
+  return out
+}
+
+// Add `key` to a hidden list or take it out.
+function setHidden(list, key, hidden) {
+  var out = keyList(list).filter(function(k) { return k !== key })
+  if (hidden) out.push(key)
+  return out
 }
 
 // ------------------------------------------------------------------ severity
