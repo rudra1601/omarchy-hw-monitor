@@ -20,7 +20,7 @@ function clamp(value, min, max) {
 // ------------------------------------------------------------------- probe
 
 function parseProbe(raw) {
-  var empty = { ok: false, cpu: { model: "CPU", cores: 0, threads: 0 }, gpus: [] }
+  var empty = { ok: false, cpu: { model: "CPU", cores: 0, threads: 0 }, gpus: [], zram: [] }
   var text = String(raw || "").trim()
   if (text === "") return empty
   try {
@@ -29,7 +29,8 @@ function parseProbe(raw) {
     return {
       ok: true,
       cpu: parsed.cpu || empty.cpu,
-      gpus: parsed.gpus instanceof Array ? parsed.gpus : []
+      gpus: parsed.gpus instanceof Array ? parsed.gpus : [],
+      zram: parsed.zram instanceof Array ? parsed.zram : []
     }
   } catch (e) {
     return empty
@@ -127,8 +128,36 @@ function parseMemory(raw) {
     cachedKib: field("Cached") + field("SReclaimable"),
     swapTotalKib: swapTotal,
     swapUsedKib: Math.max(0, swapTotal - field("SwapFree")),
+    // zswap: pages swapped out but kept compressed in RAM. Zswapped is what
+    // they would take uncompressed, Zswap what they take now.
+    zswapKib: field("Zswap"),
+    zswappedKib: field("Zswapped"),
     percent: clamp(100 * (total - available) / total, 0, 100)
   }
+}
+
+// -------------------------------------------------------------------- zram
+//
+// /sys/block/zramN/mm_stat: orig_data_size compr_data_size mem_used_total
+// mem_limit mem_used_max same_pages pages_compacted huge_pages …
+// orig is what was stored, compr what the compressor made of it, and
+// mem_used_total the RAM that actually costs, allocator overhead included.
+
+function parseZramStat(raw) {
+  var parts = String(raw || "").trim().split(/\s+/)
+  if (parts.length < 3) return null
+  var orig = toNumber(parts[0], -1)
+  var compr = toNumber(parts[1], -1)
+  var used = toNumber(parts[2], -1)
+  if (orig < 0 || compr < 0 || used < 0) return null
+  return { origBytes: orig, comprBytes: compr, memUsedBytes: used }
+}
+
+// Effective ratio: stored data against the RAM it really takes. Below 1 MiB
+// stored the allocator's fixed overhead dominates and the figure means nothing.
+function formatRatio(stored, cost) {
+  if (!(stored >= 1048576) || !(cost > 0)) return "–"
+  return (stored / cost).toFixed(1) + "×"
 }
 
 // ------------------------------------------------------------------ nvidia

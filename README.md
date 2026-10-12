@@ -52,7 +52,7 @@ Clicking the widget opens an Omarchy keyboard-driven popup panel anchored to the
 - **Telemetry dials** — 270° circular gauges with live figures for CPU load & temp, RAM usage, and GPU load & temp with dynamic temperature coloring.
 - **60s CPU load sparkline** — live history trend buffer sampled while open (zero background cost when closed).
 - **Processor details** — full CPU model name (without cutoff), load, clock frequency, dynamic temperature color, and 1m/5m/15m load average meters.
-- **Memory breakdown** — used/total GiB visual meter, available, cache, and swap usage.
+- **Memory & Swap** — used/total GiB visual meter, available, cache, and swap usage. With zram swap: a **RAM Compression** block (device, algorithm, fill, data stored, compressed size, RAM it really costs, effective ratio); with zswap, its stored size and ratio.
 - **Storage** — one row per mounted filesystem: internal disks, removable drives and network shares (NFS, SMB, sshfs, rclone), each with a used-space bar, free of total, the disk model or share source, and the filesystem type. A filesystem mounted in several places (btrfs subvolumes) is one row, named after its shortest mount point. Idle automounts are not triggered, and a network share that does not answer within 3 s is left out rather than holding up the rest. Sampled only while the panel is open.
 - **Top processes** — the heaviest processes by RAM or CPU (switch in the header), with share and CPU% per process, bars ramping toward the theme accent. The Group toggle collapses them by application (systemd scope, name fallback) with counts and sums. Sampled only while the panel is open (zero cost when closed).
 - **Graphics metrics** — full GPU card name, load, dynamic temperature color, VRAM meter, power draw (W), fan RPM, and clock speeds.
@@ -84,6 +84,7 @@ label welded to its figure, ~230px.
 | | Source | Shown |
 |---|---|---|
 | Memory | `/proc/meminfo` | used against total, measured with `MemAvailable` so reclaimable page cache is not counted as used |
+| RAM compression | `/sys/block/zramN/mm_stat`, `/proc/meminfo` (`Zswap`, `Zswapped`) | zram devices used as swap are found by `hw-probe`; ratio is data stored against RAM used, allocator overhead included |
 | CPU load | `/proc/stat` | jiffie deltas between samples, `iowait` counted as idle — the same arithmetic `top` and `btop` use |
 | CPU clock | `/proc/cpuinfo` | mean across every thread |
 | CPU temperature | `hwmon` | die/package sensor, picked by scoring (`k10temp` `Tdie`/`Tctl`, `coretemp` `Package id 0`, `zenpower`, ThinkPad, ARM SoC, then `acpitz`) |

@@ -14,6 +14,10 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
 
 - Based on upstream `main` at `ff91bb8` (1.2.0). Upstream 1.2.0 added a
   top-processes section with Italian UI strings — translated here.
+- 2026-10-12: Memory section renamed "Memory & Swap", RAM Compression block
+  (zram from `mm_stat`, devices found by `hw-probe` via `/proc/swaps`;
+  zswap from `/proc/meminfo`). zswap path untested (off on the author's
+  laptop).
 - Added: Storage section (panel only); layout controls in the gear drawer
   (order + show/hide for bar items, panel dials, panel sections); `/boot`,
   `/boot/efi`, `/efi` hidden from Storage by default (`diskHideMounts`).

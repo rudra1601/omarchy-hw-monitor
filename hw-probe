@@ -222,6 +222,26 @@ if command -v nvidia-smi >/dev/null 2>&1; then
   fi
 fi
 
+# --------------------------------------------------------------------- zram
+
+# zram devices in use as swap (compressed RAM). Their fill changes every tick
+# and is read from sysfs by the widget; only which devices exist, their
+# algorithm and their size are worked out here.
+zram_entries=()
+while read -r dev _; do
+  [[ $dev == /dev/zram* ]] || continue
+  name=${dev#/dev/}
+  dir=/sys/block/$name
+  [[ -r $dir/mm_stat ]] || continue
+  algo=$(sed -n 's/.*\[\([^]]*\)\].*/\1/p' "$dir/comp_algorithm" 2>/dev/null)
+  size=$(read_first "$dir/disksize") || size=0
+  entry="{$(printf '%s: %s, ' "$(json_str name)" "$(json_str "$name")")"
+  entry+="$(printf '%s: %s, ' "$(json_str dir)" "$(json_str "$dir")")"
+  entry+="$(printf '%s: %s, ' "$(json_str algorithm)" "$(json_str "$algo")")"
+  entry+="$(printf '%s: %d}' "$(json_str sizeBytes)" "${size:-0}")"
+  zram_entries+=("$entry")
+done < <(tail -n +2 /proc/swaps 2>/dev/null)
+
 # -------------------------------------------------------------------- output
 
 printf '{'
@@ -237,5 +257,10 @@ printf '}, "gpus": ['
 for i in "${!gpu_entries[@]}"; do
   ((i > 0)) && printf ', '
   printf '%s' "${gpu_entries[i]}"
+done
+printf '], "zram": ['
+for i in "${!zram_entries[@]}"; do
+  ((i > 0)) && printf ', '
+  printf '%s' "${zram_entries[i]}"
 done
 printf ']}\n'

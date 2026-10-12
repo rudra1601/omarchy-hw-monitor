@@ -64,7 +64,7 @@ KeyboardPanel {
   readonly property var barLabels: ({ "gpu": "GPU", "cpu": "CPU", "cpu-temp": "CPU temp", "gpu-temp": "GPU temp", "ram": "RAM" })
   readonly property var dialLabels: ({ "cpu": "CPU", "ram": "RAM", "gpu": "GPU" })
   readonly property var sectionLabels: ({
-    "dials": "Dials", "history": "CPU history", "processor": "Processor", "memory": "Memory",
+    "dials": "Dials", "history": "CPU history", "processor": "Processor", "memory": "Memory & Swap",
     "storage": "Storage", "procs": "Top processes", "gpu": "Graphics"
   })
 
@@ -128,6 +128,7 @@ KeyboardPanel {
 
   // Helpers sample only for sections that are on screen.
   function refreshWorkers(force) {
+    if (sectionShown("memory")) hw.sampleZram()
     if (sectionShown("procs")) hw.refreshProcTop()
     if (sectionShown("storage")) hw.refreshDisks(force)
   }
@@ -1109,7 +1110,7 @@ KeyboardPanel {
 
                 Text {
                   textFormat: Text.PlainText
-                  text: "Memory & Storage Cache"
+                  text: "Memory & Swap"
                   color: root.baseColor
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.bodySmall
@@ -1199,6 +1200,114 @@ KeyboardPanel {
                     label: "Swap Total"
                     value: hw.memory && hw.memory.swapTotalKib > 0 ? (Model.formatGib(Model.gibFromKib(hw.memory.swapTotalKib)) + " GiB") : "None"
                   }
+                }
+              }
+
+              // RAM compression: zram swap devices, sampled while the panel is open
+              Column {
+                width: parent.width
+                spacing: Style.space(4)
+                id: zramBlock
+                visible: hw.zram !== null
+
+                readonly property real fill: hw.zram && hw.zram.sizeBytes > 0
+                  ? Model.clamp(100 * hw.zram.origBytes / hw.zram.sizeBytes, 0, 100) : -1
+
+                Row {
+                  width: parent.width
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: "RAM Compression"
+                    color: Qt.darker(root.baseColor, 1.4)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    height: 1
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    text: hw.zram ? (hw.zram.label + (hw.zram.algorithm ? " \u00b7 " + hw.zram.algorithm : "")
+                      + " \u00b7 " + Model.formatBytes(hw.zram.origBytes) + " / " + Model.formatBytes(hw.zram.sizeBytes)) : "–"
+                    color: root.baseColor
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(6)
+                  radius: height / 2
+                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.12)
+
+                  Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    radius: parent.radius
+                    color: root.warm(root.baseColor, Model.severity(zramBlock.fill, root.warnPercent, root.criticalPercent))
+                    width: zramBlock.fill > 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (zramBlock.fill / 100))) : 0
+                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                  }
+                }
+              }
+
+              Row {
+                width: parent.width
+                spacing: Style.space(16)
+                visible: hw.zram !== null
+
+                Column {
+                  width: (parent.width - parent.spacing) / 2
+                  spacing: Style.spacing.labelGap
+
+                  InfoPair {
+                    label: "Stored"
+                    value: hw.zram ? Model.formatBytes(hw.zram.origBytes) : "–"
+                  }
+                  InfoPair {
+                    label: "Compressed"
+                    value: hw.zram ? Model.formatBytes(hw.zram.comprBytes) : "–"
+                  }
+                }
+
+                Column {
+                  width: (parent.width - parent.spacing) / 2
+                  spacing: Style.spacing.labelGap
+
+                  InfoPair {
+                    label: "RAM Used"
+                    value: hw.zram ? Model.formatBytes(hw.zram.memUsedBytes) : "–"
+                  }
+                  InfoPair {
+                    label: "Ratio"
+                    value: hw.zram ? Model.formatRatio(hw.zram.origBytes, hw.zram.memUsedBytes) : "–"
+                  }
+                }
+              }
+
+              // zswap: compressed cache in front of disk swap, from /proc/meminfo
+              Row {
+                width: parent.width
+                spacing: Style.space(16)
+                visible: !!hw.memory && hw.memory.zswappedKib > 0
+
+                InfoPair {
+                  width: (parent.width - parent.spacing) / 2
+                  label: "Zswap Stored"
+                  value: hw.memory ? Model.formatBytes(hw.memory.zswappedKib * 1024) : "–"
+                }
+                InfoPair {
+                  width: (parent.width - parent.spacing) / 2
+                  label: "Zswap Ratio"
+                  value: hw.memory ? Model.formatRatio(hw.memory.zswappedKib * 1024, hw.memory.zswapKib * 1024) : "–"
                 }
               }
             }

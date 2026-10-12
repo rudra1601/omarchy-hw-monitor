@@ -58,6 +58,12 @@ Item {
   property var memory: null
   readonly property real memPercent: memory ? memory.percent : -1
 
+  // zram swap devices summed: {label, algorithm, sizeBytes, origBytes,
+  // comprBytes, memUsedBytes}. null when the machine has none. Sampled by the
+  // panel only (sampleZram), the bar does not show it.
+  readonly property var zramDevices: probe.zram || []
+  property var zram: null
+
   property real gpuPercent: -1
   property real gpuTempC: -1
   property real gpuWatts: -1
@@ -196,6 +202,34 @@ Item {
     }
   }
 
+  function sampleZram() {
+    var devices = zramDevices
+    if (devices.length === 0) {
+      zram = null
+      return
+    }
+    var total = { origBytes: 0, comprBytes: 0, memUsedBytes: 0, sizeBytes: 0 }
+    var algorithms = []
+    for (var i = 0; i < devices.length; i++) {
+      var dev = devices[i]
+      var path = String(dev.dir) + "/mm_stat"
+      // One FileView for every device: with a single zram (the usual case)
+      // the path never changes and this is a plain reload.
+      if (zramFile.path !== path) zramFile.path = path
+      zramFile.reload()
+      var stat = Model.parseZramStat(zramFile.text())
+      if (!stat) continue
+      total.origBytes += stat.origBytes
+      total.comprBytes += stat.comprBytes
+      total.memUsedBytes += stat.memUsedBytes
+      total.sizeBytes += Model.toNumber(dev.sizeBytes, 0)
+      if (dev.algorithm && algorithms.indexOf(String(dev.algorithm)) === -1) algorithms.push(String(dev.algorithm))
+    }
+    total.algorithm = algorithms.join(", ")
+    total.label = devices.length === 1 ? String(devices[0].name) : devices.length + " devices"
+    zram = total
+  }
+
   function sampleNvidia() {
     if (_destroyed || nvidiaProcess.running) return
     nvidiaProcess.command = ["nvidia-smi",
@@ -264,6 +298,7 @@ Item {
   FileView { id: memFile; path: "/proc/meminfo"; blockAllReads: true; printErrors: false }
   FileView { id: cpuinfoFile; path: "/proc/cpuinfo"; blockAllReads: true; printErrors: false }
   FileView { id: loadFile; path: "/proc/loadavg"; blockAllReads: true; printErrors: false }
+  FileView { id: zramFile; path: ""; blockAllReads: true; printErrors: false }
 
   FileView {
     id: cpuTempFile
