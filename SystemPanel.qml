@@ -1024,19 +1024,10 @@ KeyboardPanel {
                 }
               }
 
-              // Load average 1m, 5m, 15m
+              // Load average 1m, 5m, 15m: the period in each meter's title, no heading row
               Column {
                 width: parent.width
                 spacing: Style.space(6)
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: "Load Average (1m · 5m · 15m)"
-                  color: Qt.darker(root.baseColor, 1.4)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: true
-                }
 
                 Row {
                   width: parent.width
@@ -1047,7 +1038,7 @@ KeyboardPanel {
                   LoadMeter {
                     id: lm1
                     width: (parent.width - parent.spacing * 2) / 3
-                    period: "1 min"
+                    period: "Load 1m"
                     value: hw.load ? hw.load.one : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
@@ -1058,7 +1049,7 @@ KeyboardPanel {
                   LoadMeter {
                     id: lm5
                     width: (parent.width - parent.spacing * 2) / 3
-                    period: "5 min"
+                    period: "Load 5m"
                     value: hw.load ? hw.load.five : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
@@ -1069,7 +1060,7 @@ KeyboardPanel {
                   LoadMeter {
                     id: lm15
                     width: (parent.width - parent.spacing * 2) / 3
-                    period: "15 min"
+                    period: "Load 15m"
                     value: hw.load ? hw.load.fifteen : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
