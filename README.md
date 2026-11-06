@@ -222,6 +222,7 @@ omarchy bar set zoltanf.hw-monitor fahrenheit true --json
 | `panelSections` | array/string | `dials,history,processor,memory,storage,procs,gpu` | Order of the panel sections. Missing ones are appended, so new sections never vanish. |
 | `panelSectionsHidden` | array/string | `[]` | Panel sections to hide. |
 | `panelSectionsCollapsed` | array/string | `[]` | Panel sections folded to their header. Clicking a section's header edits this; folded sections skip their sampling. |
+| `pauseWhenIdleSec` | int | `120` | Stop sampling after this many seconds without keyboard or mouse input (screensaver, lock, screen off), unless the panel is open; the first input resumes it. A playing video counts as activity. `0` never pauses. |
 | `panelDials` | array/string | `cpu,ram,gpu` | Order of the round dials at the top of the panel. |
 | `panelDialsHidden` | array/string | `[]` | Dials to hide. |
 | `ramFormat` | string | `"used/total"` | `"used/total"` (`12/23G`), `"used"` (`12.3G`), `"percent"` (`52%`), `"free"` (`11.1G`), or `"available"` (`11.1G`). |
@@ -289,6 +290,9 @@ With more than one monitor, each bar draws its own copy of the widget, but
 only one copy samples and the others show its readings. The system panel is
 built when it opens and dropped once it closes, and while it is open the
 widget samples once a second, which also feeds the CPU history.
+Hovering the widget starts the process list and storage scan early, so they
+are usually ready when the panel opens. After two minutes without input
+(screensaver, lock, screen off) sampling pauses until you are back.
 
 `blockAllReads` is set on those views deliberately. Without it `reload()` is
 asynchronous and `text()` returns the *previous* tick's contents, so every

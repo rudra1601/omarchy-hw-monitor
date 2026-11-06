@@ -64,6 +64,22 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
   first list arrives (first open after a shell start, ~0.5 s).
 - While the panel is open the Service ticks at 1 s and emits `sampled()`; the
   panel's history and helper refresh follow that signal (no timer of its own).
+- Settings writes are deferred centrally: `Widget.persistSettings` sets
+  `root.settings` at once and `flushSettings()` writes shell.json 0.8 s later
+  (merged via `_pendingEntry`; flushed on destruction). Other monitors' copies
+  update when the write lands.
+- Hover prefetch: `button.tooltipHovered` → `hw.prefetchPanel(procs, disks)`
+  runs the panel helpers early (normal throttles). `hyprctl dispatch
+  movecursor` does not produce hover events, so a real pointer is needed to
+  test it.
+- Idle pause: an `IdleMonitor` (respectInhibitors, like Omarchy's idle
+  service) stops `sampleTimer` after `pauseWhenIdleSec` (120) unless the panel
+  is open. **IdleMonitor ignores timeout changes after creation**, and the
+  settings arrive just after the Service is created, so the monitor is built
+  dynamically (`rebuildIdleMonitor`, 200 ms after settings settle). With
+  Omarchy's "stay awake" on (an inhibitor) it never pauses, by design.
+  Verified 2026-11-06 with a 5 s timeout and inhibitors ignored: paused after
+  5 s idle, resumed on the first mouse move.
 - Measuring: whole-shell CPU varies ±1-2% between 40 s windows on this laptop
   while it is in use, so A/B numbers need interleaved runs.
 - `disk-probe` (bash) runs `findmnt --real` twice — local filesystems, then

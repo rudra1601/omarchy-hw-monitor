@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import Quickshell.Wayland
 import "Model.js" as Model
 
 // Samples CPU, memory, and GPU telemetry straight out of /proc and /sys.
@@ -316,7 +317,7 @@ Item {
   // (intero clampato, sort ram/cpu validato, flag --group per presenza):
   // la stringa grezza del setting non tocca mai argv. Niente PATH, niente shell.
   function refreshProcTop() {
-    if (_destroyed || !active || !procPanelOpen || procTopProcess.running) return
+    if (_destroyed || !active || !(procPanelOpen || _prefetching) || procTopProcess.running) return
     var now = Date.now()
     if (_lastProcTopTry > 0 && now - _lastProcTopTry < 3000) return
     _lastProcTopTry = now
@@ -331,8 +332,20 @@ Item {
 
   // At most every 5 s; free space moves slowly. `force` skips the throttle,
   // for opening the panel and the R key.
+  // Hover prefetch: the widget calls this when the pointer enters it, so the
+  // panel's process list and storage are usually ready by the click. The
+  // usual throttles apply (processes every 3 s, disks every 5 s).
+  property bool _prefetching: false
+  function prefetchPanel(wantProcs, wantDisks) {
+    if (_destroyed || !active || procPanelOpen) return
+    _prefetching = true
+    if (wantProcs) refreshProcTop()
+    if (wantDisks) refreshDisks(false)
+    _prefetching = false
+  }
+
   function refreshDisks(force) {
-    if (_destroyed || !active || !procPanelOpen || diskProcess.running) return
+    if (_destroyed || !active || !(procPanelOpen || _prefetching) || diskProcess.running) return
     var now = Date.now()
     if (!force && _lastDiskTry > 0 && now - _lastDiskTry < 5000) return
     _lastDiskTry = now
@@ -716,6 +729,7 @@ Item {
     nvidiaByteGuard.stop()
     sampleTimer.stop()
     warmupSampleTimer.stop()
+    idleRearm.stop()
     if (procTopProcess.running) procTopProcess.running = false
     if (diskProcess.running) diskProcess.running = false
     if (nvidiaProcess.running) nvidiaProcess.running = false
@@ -729,12 +743,58 @@ Item {
     // One tick a second while the panel is open (its CPU history is per
     // second), the configured interval otherwise.
     interval: root.procPanelOpen ? Math.min(1000, root.intervalSec * 1000) : root.intervalSec * 1000
-    running: root.active
+    running: root.active && !root.idlePaused
     repeat: true
     onTriggered: {
       if (root._destroyed) return
       root.sample()
     }
+  }
+
+  // Sampling pauses after pauseWhenIdleSec without keyboard or mouse input
+  // (screensaver, lock, screen off, away), unless the panel is open. Idle
+  // inhibitors such as a playing video count as activity, as for Omarchy's own
+  // idle handling. The first input resumes with a fresh reading. 0 = never.
+  readonly property int pauseWhenIdleSec: intSetting("pauseWhenIdleSec", 120, 0, 3600)
+  readonly property bool idlePaused: pauseWhenIdleSec > 0 && idleMonitor !== null && idleMonitor.isIdle && !procPanelOpen
+
+  // An IdleMonitor keeps the timeout it was created with: changing it later
+  // does not reach the compositor (observed 2026-11-06), and the settings
+  // arrive just after creation, so a monitor bound to the setting kept the
+  // built-in default. It is therefore built once the settings have settled
+  // and rebuilt whenever pauseWhenIdleSec or `active` changes.
+  property QtObject idleMonitor: null
+
+  Component {
+    id: idleMonitorComponent
+    IdleMonitor {
+      respectInhibitors: true
+    }
+  }
+
+  function rebuildIdleMonitor() {
+    if (idleMonitor) {
+      idleMonitor.destroy()
+      idleMonitor = null
+    }
+    if (_destroyed || !active || pauseWhenIdleSec <= 0) return
+    idleMonitor = idleMonitorComponent.createObject(root, { timeout: pauseWhenIdleSec })
+  }
+
+  Timer {
+    id: idleRearm
+    interval: 200
+    onTriggered: root.rebuildIdleMonitor()
+  }
+
+  onPauseWhenIdleSecChanged: idleRearm.restart()
+
+  onIdlePausedChanged: {
+    if (_destroyed || !active || idlePaused) return
+    // The first reading after a pause spans the whole pause; the warm-up
+    // sample 350 ms later shows current CPU load again.
+    sample()
+    warmupSampleTimer.restart()
   }
 
   // CPU usage needs two samples. Take the second one shortly after startup so
@@ -759,6 +819,12 @@ Item {
   // `active` follows the widget's screen membership, which collapses to true
   // for a moment while the window/screen is being torn down or hotplugged —
   // exactly the window where start() must not run.
-  onActiveChanged: if (!_destroyed && active) start()
-  Component.onCompleted: start()
+  onActiveChanged: {
+    if (!_destroyed && active) start()
+    idleRearm.restart()
+  }
+  Component.onCompleted: {
+    start()
+    idleRearm.restart()
+  }
 }

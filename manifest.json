@@ -50,6 +50,7 @@
       ],
       "panelSectionsHidden": [],
       "panelSectionsCollapsed": [],
+      "pauseWhenIdleSec": 120,
       "panelDials": [
         "cpu",
         "ram",
@@ -198,6 +199,13 @@
         "label": "Hidden panel sections",
         "defaultValue": "",
         "description": "Comma-separated panel sections to hide (dials, history, processor, memory, storage, procs, gpu)."
+      },
+      {
+        "key": "pauseWhenIdleSec",
+        "type": "number",
+        "label": "Pause when idle (s)",
+        "defaultValue": 120,
+        "description": "Stop sampling after this many seconds without keyboard or mouse input (screensaver, lock, screen off), unless the panel is open. A playing video counts as activity. 0 never pauses."
       },
       {
         "key": "panelSectionsCollapsed",

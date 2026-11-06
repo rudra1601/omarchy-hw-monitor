@@ -512,14 +512,50 @@ Panel {
 
   // Several keys in one write, so a toggle that touches two settings does not
   // race its own first half.
+  // A change from the bar or the panel shows at once (root.settings) and is
+  // written to shell.json 0.8 s later, merged with any changes made meanwhile:
+  // the write copies and reloads the whole shell config on the UI thread,
+  // which made every click lag. Copies on other monitors follow once written.
+  property var _pendingEntry: null
+
   function persistSettings(changes) {
-    var live = currentEntry()
+    var live = root._pendingEntry || currentEntry()
     var entry = { id: root.moduleName }
     for (var k in live) if (k !== "id") entry[k] = live[k]
     for (var c in changes) entry[c] = changes[c]
     root.settings = entry
+    root._pendingEntry = entry
+    settingsSave.restart()
+  }
+
+  function flushSettings() {
+    var entry = root._pendingEntry
+    if (!entry) return
+    root._pendingEntry = null
+    settingsSave.stop()
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function") {
       root.bar.shell.updateEntryInline(root.moduleName, entry)
+    }
+  }
+
+  Timer {
+    id: settingsSave
+    interval: 800
+    onTriggered: root.flushSettings()
+  }
+
+  // A widget reloaded or removed within the 0.8 s still saves its change.
+  Component.onDestruction: flushSettings()
+
+  // Hovering the widget starts the panel's process list and storage scan, so
+  // they are usually ready by the click. Skipped for sections that are hidden
+  // or folded, and when a clickCommand replaces the panel.
+  Connections {
+    target: button
+    function onTooltipHoveredChanged() {
+      if (!button.tooltipHovered || root.opened || root.clickCommand !== "") return
+      root.hw.prefetchPanel(systemPanel.sectionShown("procs") && !systemPanel.sectionCollapsed("procs"),
+                            systemPanel.sectionShown("storage") && !systemPanel.sectionCollapsed("storage"))
     }
   }
 
