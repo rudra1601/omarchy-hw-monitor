@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Discovers which sysfs files this machine exposes for CPU and GPU telemetry
 # and prints them as JSON.
@@ -22,11 +22,18 @@ read_first() {
 }
 
 # JSON string escaping. Sensor and PCI names come from the kernel and lspci,
-# so backslashes and quotes are unlikely but not impossible.
+# so backslashes and quotes are unlikely but not impossible. Control
+# characters (any C0 byte: CR, newline, ESC, ...) are stripped entirely and
+# tabs become spaces, so the payload is always one clean JSON line — the
+# consumer degrades to defaults on invalid JSON rather than misparsing.
 json_str() {
   local s=${1//\\/\\\\}
   s=${s//\"/\\\"}
   s=${s//	/ }
+  # Any remaining C0 control (CR, newline, ESC, ...) would produce invalid
+  # one-line JSON; the consumer degrades to defaults on invalid JSON rather
+  # than misparsing, but there is no reason to emit it in the first place.
+  s=${s//[[:cntrl:]]/}
   printf '"%s"' "$s"
 }
 
@@ -122,15 +129,17 @@ done
 
 # lspci turns 1002:7550 into "Navi 48 [Radeon RX 9070 XT]", which is the only
 # human-readable name a DRM card exposes. Missing pciutils just means the
-# tooltip shows the driver name instead.
+# tooltip shows the driver name instead. Resolved once to an absolute path so
+# the session PATH cannot substitute a different binary at call time.
+lspci_bin=$(command -v lspci 2>/dev/null)
 have_lspci=0
-command -v lspci >/dev/null 2>&1 && have_lspci=1
+[[ -n $lspci_bin ]] && have_lspci=1
 
 gpu_name_for() {
   local dev=$1 driver=$2 slot line name
   slot=$(sed -n 's/^PCI_SLOT_NAME=//p' "$dev/uevent" 2>/dev/null | head -1)
   if ((have_lspci)) && [[ -n $slot ]]; then
-    line=$(lspci -s "$slot" 2>/dev/null | head -1)
+    line=$("$lspci_bin" -s "$slot" 2>/dev/null | head -1)
     # "0d:00.0 VGA compatible controller: AMD/ATI Navi 48 [Radeon RX 9070 XT]"
     name=${line#*: }
     name=${name%% (rev *}
@@ -167,6 +176,15 @@ for card in /sys/class/drm/card[0-9]*; do
   [[ -d $dev ]] || continue
 
   driver=$(sed -n 's/^DRIVER=//p' "$dev/uevent" 2>/dev/null | head -1)
+
+  # A headless Intel card is a render-offload dGPU that powers itself down
+  # when idle. Its hwmon reads wake it and restart the autosuspend timer, so
+  # sampling it every tick keeps it in D0 for good (~11 W on an Arc A370M).
+  if [[ $driver == i915 || $driver == xe ]]; then
+    connectors=("$card"-*)
+    [[ -e ${connectors[0]} ]] || continue
+  fi
+
   hw=""
   for candidate in "$dev"/hwmon/hwmon*; do
     [[ -d $candidate ]] && { hw=$candidate; break; }
@@ -208,11 +226,17 @@ done
 
 # NVIDIA reports nothing useful through sysfs, so it gets sampled by polling
 # nvidia-smi instead. Declared last: a sysfs-capable card is always cheaper.
-if command -v nvidia-smi >/dev/null 2>&1; then
-  nv_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+# Resolved once to an absolute path; the widget reuses it (nvidiaPath) for its
+# own sampling instead of re-resolving from the session PATH.
+nv_bin=$(command -v nvidia-smi 2>/dev/null)
+if [[ -n $nv_bin ]]; then
+  # With no NVIDIA card nvidia-smi fails but prints its error on stdout, which
+  # would otherwise be taken for a GPU name.
+  nv_name=$("$nv_bin" --query-gpu=name --format=csv,noheader 2>/dev/null | head -1) || nv_name=""
   if [[ -n $nv_name ]]; then
     nv="{$(printf '%s: %s, ' "$(json_str kind)" "$(json_str nvidia)")"
     nv+="$(printf '%s: %s, ' "$(json_str name)" "$(json_str "$(trim "$nv_name")")")"
+    nv+="$(printf '%s: %s, ' "$(json_str nvidiaPath)" "$(json_str "$nv_bin")")"
     nv+="$(printf '%s: %s' "$(json_str index)" 0)}"
     if ((${#gpu_entries[@]} == 0)); then
       gpu_entries=("$nv")

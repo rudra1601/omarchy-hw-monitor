@@ -14,6 +14,13 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
 
 - Based on upstream `main` at `ff91bb8` (1.2.0). Upstream 1.2.0 added a
   top-processes section with Italian UI strings — translated here.
+- 2026-11-06: merged upstream 1.3.2 (`a74aaec`): security hardening of the
+  helpers, browser-tab hints in `proc_top.py`, README restyle. Kept on purpose:
+  the fork's two-digit temperature width and no RAM width reservation
+  (`Widget.qml`), the fork's `SystemPanel.qml` (upstream only translated
+  strings). `Model.parseProbe` now also validates the fork's `zram` entries
+  (`dir` must be `/sys/block/zramN`). `disk-probe` has a watchdog but no byte
+  guard, unlike upstream's helpers. Version `1.3.2+storage.3`.
 - 2026-10-12: Memory section renamed "Memory & Swap", RAM Compression block
   (zram from `mm_stat`, devices found by `hw-probe` via `/proc/swaps`;
   zswap from `/proc/meminfo`). zswap path untested (off on the author's
