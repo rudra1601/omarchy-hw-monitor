@@ -55,6 +55,11 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
   `width`) are gated by `root.layoutAnimated`, which turns on 400 ms after
   open. Without the gate the lazily built body visibly slid and grew into place
   on every open. A new layout Behavior needs `enabled: root.layoutAnimated`.
+- Folding: a header click changes `foldState` at once and `foldPersist`
+  writes `panelSectionsCollapsed` 0.8 s later (a settings write copies and
+  reloads the whole shell config on the UI thread and stalled the animation).
+  While `folding` (220 ms) the section `y` slides are off so the cards below
+  follow the folding card instead of chasing it.
   The process list keeps `topProcCount` invisible placeholder rows until the
   first list arrives (first open after a shell start, ~0.5 s).
 - While the panel is open the Service ticks at 1 s and emits `sampled()`; the

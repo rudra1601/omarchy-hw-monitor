@@ -125,14 +125,46 @@ KeyboardPanel {
 
   // A click on a card's header folds it down to the header; remembered in
   // panelSectionsCollapsed. Folded cards skip their helper sampling.
+  //
+  // The click changes foldState at once and the setting is written 0.8 s
+  // later: writing it copies and reloads the whole shell config on the UI
+  // thread, which stalled the fold animation when done on the click.
+  property var foldState: []
+  onSectionsCollapsedChanged: if (!foldPersist.running) foldState = sectionsCollapsed
+  Component.onCompleted: foldState = sectionsCollapsed
+
+  property QtObject foldPersist: Timer {
+    interval: 800
+    onTriggered: root.persistSetting("panelSectionsCollapsed", root.foldState)
+  }
+
+  // True while a fold animates: the sections below then follow the card's
+  // height directly instead of chasing it with their own slide animation.
+  property bool folding: false
+  property bool foldRefreshPending: false
+  property QtObject foldSettle: Timer {
+    interval: 220
+    onTriggered: {
+      root.folding = false
+      if (root.foldRefreshPending) {
+        root.foldRefreshPending = false
+        root.refreshWorkers(true)
+      }
+    }
+  }
+
   function sectionCollapsed(key) {
-    return sectionsCollapsed.indexOf(key) !== -1
+    return foldState.indexOf(key) !== -1
   }
 
   function toggleCollapsed(key) {
     var collapse = !sectionCollapsed(key)
-    persistSetting("panelSectionsCollapsed", Model.setHidden(sectionsCollapsed, key, collapse))
-    if (!collapse) Qt.callLater(function() { root.refreshWorkers(true) })
+    folding = true
+    foldState = Model.setHidden(foldState, key, collapse)
+    // An unfolded card refreshes its data once the animation is over.
+    if (!collapse) foldRefreshPending = true
+    foldSettle.restart()
+    foldPersist.restart()
   }
 
   function moveSection(key, delta) {
@@ -844,7 +876,7 @@ KeyboardPanel {
             visible: root.sectionShown("dials")
             width: parent.width
             spacing: Style.space(8)
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             Repeater {
               model: root.visibleDials
@@ -871,7 +903,7 @@ KeyboardPanel {
             id: historySection
             y: sectionStack.offsetOf("history")
             visible: root.sectionShown("history")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("history") ? sparklineCol.children[0].implicitHeight : sparklineCol.implicitHeight) + Style.space(24)
             clip: true
@@ -1006,7 +1038,7 @@ KeyboardPanel {
             id: processorSection
             y: sectionStack.offsetOf("processor")
             visible: root.sectionShown("processor")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("processor") ? procCol.children[0].implicitHeight : procCol.implicitHeight) + Style.space(24)
             clip: true
@@ -1150,7 +1182,7 @@ KeyboardPanel {
             id: memorySection
             y: sectionStack.offsetOf("memory")
             visible: root.sectionShown("memory")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("memory") ? memCol.children[0].implicitHeight : memCol.implicitHeight) + Style.space(24)
             clip: true
@@ -1410,7 +1442,7 @@ KeyboardPanel {
             id: storageCard
             y: sectionStack.offsetOf("storage")
             visible: root.sectionShown("storage")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             readonly property var diskList: Model.visibleDisks(hw.disks, root.diskHideMounts)
 
@@ -1586,7 +1618,7 @@ KeyboardPanel {
           Rectangle {
             id: procsSection
             y: sectionStack.offsetOf("procs")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("procs") ? topProcCol.children[0].implicitHeight : topProcCol.implicitHeight) + Style.space(24)
             clip: true
@@ -1795,7 +1827,7 @@ KeyboardPanel {
           Rectangle {
             id: gpuSection
             y: sectionStack.offsetOf("gpu")
-            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated && !root.folding; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("gpu") ? gpuCol.children[0].implicitHeight : gpuCol.implicitHeight) + Style.space(24)
             clip: true
