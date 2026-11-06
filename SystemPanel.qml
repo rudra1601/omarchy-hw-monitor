@@ -248,6 +248,9 @@ KeyboardPanel {
   }
 
   onOpenChanged: {
+    layoutAnimated = false
+    if (open) layoutSettle.restart()
+    else layoutSettle.stop()
     if (open) {
       hw.sample()
       hw.procPanelOpen = true
@@ -264,6 +267,23 @@ KeyboardPanel {
   // The sampler ticks once a second while the panel is open; each tick adds a
   // history point and lets the panel's helpers (processes, disks) run when
   // their own throttles allow.
+  // Layout animations (sections sliding, cards folding, bars filling) stay off
+  // while the body is built on open, so it appears at its final size, and come
+  // on once it has settled; after that, folds and live changes animate.
+  property bool layoutAnimated: false
+
+  // Stand-ins for the process rows until the first list arrives.
+  readonly property var procPlaceholders: {
+    var rows = []
+    var n = hw.topProcCount > 0 ? hw.topProcCount : 6
+    for (var i = 0; i < n; i++) rows.push({ name: "", count: 1, pid: 0, cpu: 0, rssKib: 0, memPct: 0 })
+    return rows
+  }
+  property QtObject layoutSettle: Timer {
+    interval: 400
+    onTriggered: root.layoutAnimated = true
+  }
+
   // (A property, not a child: KeyboardPanel's default property takes Items.)
   property QtObject historyFollower: Connections {
     target: root.hw
@@ -824,7 +844,7 @@ KeyboardPanel {
             visible: root.sectionShown("dials")
             width: parent.width
             spacing: Style.space(8)
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             Repeater {
               model: root.visibleDials
@@ -851,11 +871,11 @@ KeyboardPanel {
             id: historySection
             y: sectionStack.offsetOf("history")
             visible: root.sectionShown("history")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("history") ? sparklineCol.children[0].implicitHeight : sparklineCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -986,11 +1006,11 @@ KeyboardPanel {
             id: processorSection
             y: sectionStack.offsetOf("processor")
             visible: root.sectionShown("processor")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("processor") ? procCol.children[0].implicitHeight : procCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1089,6 +1109,7 @@ KeyboardPanel {
                     id: lm1
                     width: (parent.width - parent.spacing * 2) / 3
                     period: "Load 1m"
+                    meterAnimated: root.layoutAnimated
                     value: hw.load ? hw.load.one : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
@@ -1100,6 +1121,7 @@ KeyboardPanel {
                     id: lm5
                     width: (parent.width - parent.spacing * 2) / 3
                     period: "Load 5m"
+                    meterAnimated: root.layoutAnimated
                     value: hw.load ? hw.load.five : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
@@ -1111,6 +1133,7 @@ KeyboardPanel {
                     id: lm15
                     width: (parent.width - parent.spacing * 2) / 3
                     period: "Load 15m"
+                    meterAnimated: root.layoutAnimated
                     value: hw.load ? hw.load.fifteen : 0
                     maxVal: parent.maxCores
                     baseColor: root.baseColor
@@ -1127,11 +1150,11 @@ KeyboardPanel {
             id: memorySection
             y: sectionStack.offsetOf("memory")
             visible: root.sectionShown("memory")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("memory") ? memCol.children[0].implicitHeight : memCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1224,7 +1247,7 @@ KeyboardPanel {
                     radius: parent.radius
                     color: root.warm(root.baseColor, Model.severity(hw.memPercent, root.warnPercent, root.criticalPercent))
                     width: hw.memPercent >= 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (hw.memPercent / 100))) : 0
-                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    Behavior on width { enabled: root.layoutAnimated; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                   }
                 }
               }
@@ -1314,7 +1337,7 @@ KeyboardPanel {
                     radius: parent.radius
                     color: root.warm(root.baseColor, Model.severity(zramBlock.fill, root.warnPercent, root.criticalPercent))
                     width: zramBlock.fill > 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (zramBlock.fill / 100))) : 0
-                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    Behavior on width { enabled: root.layoutAnimated; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                   }
                 }
               }
@@ -1379,7 +1402,7 @@ KeyboardPanel {
             width: parent.width
             implicitHeight: (root.sectionCollapsed("storage") ? diskCol.children[0].implicitHeight : diskCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1387,7 +1410,7 @@ KeyboardPanel {
             id: storageCard
             y: sectionStack.offsetOf("storage")
             visible: root.sectionShown("storage")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
             readonly property var diskList: Model.visibleDisks(hw.disks, root.diskHideMounts)
 
@@ -1513,7 +1536,7 @@ KeyboardPanel {
                       radius: parent.radius
                       color: fillColor
                       width: modelData.percent >= 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (modelData.percent / 100))) : 0
-                      Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                      Behavior on width { enabled: root.layoutAnimated; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                     }
                   }
 
@@ -1563,11 +1586,11 @@ KeyboardPanel {
           Rectangle {
             id: procsSection
             y: sectionStack.offsetOf("procs")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("procs") ? topProcCol.children[0].implicitHeight : topProcCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1662,19 +1685,26 @@ KeyboardPanel {
                 }
               }
 
+              // Until the first list arrives, invisible placeholder rows keep
+              // the card at its final height, with the status line over them.
+              Item {
+                width: parent.width
+                implicitHeight: procList.implicitHeight
+
               Column {
+                id: procList
                 width: parent.width
                 spacing: Style.space(6)
-                visible: hw.topProcs.length > 0
 
                 Repeater {
-                  model: hw.topProcs
+                  model: hw.topProcs.length > 0 ? hw.topProcs : root.procPlaceholders
                   delegate: Column {
                     required property var modelData
                     required property int index
 
                     width: parent.width
                     spacing: Style.space(3)
+                    opacity: hw.topProcs.length > 0 ? 1 : 0
 
                     readonly property int total: hw.topProcs.length
                     readonly property bool sortCpu: hw.topProcSort === "cpu"
@@ -1739,7 +1769,7 @@ KeyboardPanel {
                         radius: parent.radius
                         color: sevColor
                         width: Math.max(parent.height, Math.min(parent.width, parent.width * shareD))
-                        Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                        Behavior on width { enabled: root.layoutAnimated; NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
                       }
                     }
                   }
@@ -1748,6 +1778,7 @@ KeyboardPanel {
 
               Text {
                 textFormat: Text.PlainText
+                anchors.top: parent.top
                 visible: hw.topProcs.length === 0
                 width: parent.width
                 wrapMode: Text.Wrap
@@ -1756,6 +1787,7 @@ KeyboardPanel {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
               }
+              }
             }
           }
 
@@ -1763,11 +1795,11 @@ KeyboardPanel {
           Rectangle {
             id: gpuSection
             y: sectionStack.offsetOf("gpu")
-            Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+            Behavior on y { enabled: root.layoutAnimated; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
             implicitHeight: (root.sectionCollapsed("gpu") ? gpuCol.children[0].implicitHeight : gpuCol.implicitHeight) + Style.space(24)
             clip: true
-            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on implicitHeight { enabled: root.layoutAnimated; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1863,7 +1895,7 @@ KeyboardPanel {
                     radius: parent.radius
                     color: root.warm(root.baseColor, Model.severity(hw.gpuVramPercent, root.warnPercent, root.criticalPercent))
                     width: hw.gpuVramPercent >= 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * (hw.gpuVramPercent / 100))) : 0
-                    Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                    Behavior on width { enabled: root.layoutAnimated; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
                   }
                 }
               }
@@ -2069,6 +2101,7 @@ KeyboardPanel {
   }
 
   component LoadMeter: Column {
+    property bool meterAnimated: true
     id: meterRoot
     property string period: ""
     property real value: 0
@@ -2124,7 +2157,7 @@ KeyboardPanel {
                          meterRoot.baseColor.a)
         }
         width: meterRoot.maxVal > 0 ? Math.max(parent.height, Math.min(parent.width, parent.width * Math.min(1, meterRoot.value / meterRoot.maxVal))) : 0
-        Behavior on width { NumberAnimation { duration: 240 } }
+        Behavior on width { enabled: meterAnimated; NumberAnimation { duration: 240 } }
       }
     }
   }

@@ -51,6 +51,12 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
   code must not reference content ids; use `loadedContent` (see the sparkline
   size properties). Non-Item helpers at the panel root go in a property
   (`historyFollower`), not as children: the default property takes Items.
+- Layout Behaviors in the panel (section `y`, card `implicitHeight`, bar fill
+  `width`) are gated by `root.layoutAnimated`, which turns on 400 ms after
+  open. Without the gate the lazily built body visibly slid and grew into place
+  on every open. A new layout Behavior needs `enabled: root.layoutAnimated`.
+  The process list keeps `topProcCount` invisible placeholder rows until the
+  first list arrives (first open after a shell start, ~0.5 s).
 - While the panel is open the Service ticks at 1 s and emits `sampled()`; the
   panel's history and helper refresh follow that signal (no timer of its own).
 - Measuring: whole-shell CPU varies ±1-2% between 40 s windows on this laptop
