@@ -79,6 +79,11 @@ Item {
   // sopravvive tra i poll. Guardia singola: procTopProcess.running.
   property var topProcs: []
   property bool procPanelOpen: false
+  // System summary for the panel header, read only while the panel is open.
+  property string hostName: ""
+  property string osName: ""
+  property real uptimeSec: -1
+  onProcPanelOpenChanged: if (procPanelOpen) sampleSystem()
   property string procTopTime: ""
   property bool procTopFailed: false
   property string procGroupedBy: "none"
@@ -171,7 +176,21 @@ Item {
     probeProcess.running = true
   }
 
+  // Host name and OS do not change while the shell runs: read once.
+  function sampleSystem() {
+    if (_destroyed) return
+    if (osName === "") {
+      hostFile.reload()
+      hostName = Model.cleanString(hostFile.text().trim(), 64) || ""
+      osFile.reload()
+      osName = Model.parseOsRelease(osFile.text())
+    }
+    uptimeFile.reload()
+    uptimeSec = Model.parseUptime(uptimeFile.text())
+  }
+
   function sample() {
+    if (procPanelOpen) sampleSystem()
     statFile.reload()
     var jiffies = Model.parseCpuJiffies(statFile.text())
     if (jiffies) {
@@ -339,6 +358,9 @@ Item {
   FileView { id: memFile; path: "/proc/meminfo"; blockAllReads: true; printErrors: false }
   FileView { id: cpuinfoFile; path: "/proc/cpuinfo"; blockAllReads: true; printErrors: false }
   FileView { id: loadFile; path: "/proc/loadavg"; blockAllReads: true; printErrors: false }
+  FileView { id: uptimeFile; path: "/proc/uptime"; blockAllReads: true; printErrors: false }
+  FileView { id: hostFile; path: "/proc/sys/kernel/hostname"; blockAllReads: true; printErrors: false }
+  FileView { id: osFile; path: "/etc/os-release"; blockAllReads: true; printErrors: false }
   FileView { id: zramFile; path: ""; blockAllReads: true; printErrors: false }
 
   FileView {

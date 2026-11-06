@@ -91,8 +91,8 @@ Nothing to configure — it finds this machine's sensors on its own.
 Clicking the widget opens an Omarchy keyboard-driven popup panel anchored to
 the bar:
 
-- **Hero summary & Unit Toggle** — core/thread count, GPU summary, and a live
-  toggle between **°C** and **°F** at the top right.
+- **Header** — the CPU model, with the host name, OS version and uptime
+  under it.
 - **Telemetry dials** — 270° circular gauges with live figures for CPU load &
   temp, RAM usage, and GPU load & temp with dynamic temperature coloring.
 - **60s CPU load sparkline** — live history trend buffer sampled while open

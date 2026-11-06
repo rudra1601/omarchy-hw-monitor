@@ -339,18 +339,23 @@ KeyboardPanel {
 
               Text {
                 textFormat: Text.PlainText
-                text: "Hardware"
+                width: parent.width
+                wrapMode: Text.Wrap
+                text: hw.cpuInfo && hw.cpuInfo.model ? hw.cpuInfo.model : "System Telemetry"
                 color: root.baseColor
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.title
                 font.bold: true
               }
 
+              // Host · OS · uptime
               Text {
                 textFormat: Text.PlainText
                 width: parent.width
                 wrapMode: Text.Wrap
-                text: hw.cpuInfo && hw.cpuInfo.model ? hw.cpuInfo.model : "System Telemetry"
+                visible: text !== ""
+                text: [hw.hostName, hw.osName, Model.formatUptime(hw.uptimeSec)]
+                  .filter(function (part) { return part !== "" }).join("  \u00b7  ")
                 color: root.dimColor
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption

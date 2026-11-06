@@ -220,6 +220,39 @@ function parseLoadAverage(raw) {
   return { one: toNumber(parts[0]), five: toNumber(parts[1]), fifteen: toNumber(parts[2]) }
 }
 
+// ------------------------------------------------------------------ system
+
+// /proc/uptime: "<seconds since boot> <idle seconds summed over CPUs>".
+function parseUptime(raw) {
+  var first = String(raw || "").trim().split(/\s+/)[0]
+  var sec = toNumberSafe(first, -1)
+  return sec >= 0 ? sec : -1
+}
+
+// "up 2d 6h", "up 5h 12m", "up 12m"; empty when unknown.
+function formatUptime(sec) {
+  if (!isFinite(sec) || sec < 0) return ""
+  var m = Math.floor(sec / 60), h = Math.floor(m / 60), d = Math.floor(h / 24)
+  if (d > 0) return "up " + d + "d " + (h % 24) + "h"
+  if (h > 0) return "up " + h + "h " + (m % 60) + "m"
+  return "up " + m + "m"
+}
+
+// /etc/os-release: PRETTY_NAME (or NAME), plus BUILD_ID or VERSION_ID when the
+// name does not already carry it. Returns "" when nothing usable is found.
+function parseOsRelease(raw) {
+  var text = String(raw || "")
+  function field(key) {
+    var match = text.match(new RegExp("^" + key + "=(.*)$", "m"))
+    if (!match) return ""
+    return cleanString(match[1].trim().replace(/^(["'])(.*)\1$/, "$2"), 64) || ""
+  }
+  var name = field("PRETTY_NAME") || field("NAME")
+  var version = field("BUILD_ID") || field("VERSION_ID")
+  if (name === "") return ""
+  return version !== "" && name.indexOf(version) === -1 ? name + " " + version : name
+}
+
 // ------------------------------------------------------------------ memory
 
 // MemAvailable is the kernel's own estimate of what a new allocation can get
