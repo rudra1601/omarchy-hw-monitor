@@ -1695,26 +1695,6 @@ KeyboardPanel {
                   anchors.verticalCenter: parent.verticalCenter
                   onPicked: root.persistSetting("topProcGroup", !hw.topProcGroup)
                 }
-
-                Item {
-                  width: Math.max(0, parent.width - procTopIcon.implicitWidth - parent.children[1].implicitWidth - sortRamChip.implicitWidth - sortCpuChip.implicitWidth - groupChip.implicitWidth - procTopStamp.implicitWidth - parent.spacing * 6)
-                  height: 1
-                }
-
-                Text {
-                  id: procTopStamp
-                  textFormat: Text.PlainText
-                  text: {
-                    var metric = hw.topProcSort === "cpu" ? "by CPU" : "by RAM"
-                    if (hw.procTopTime === "") return metric
-                    return metric + " \u00b7 " + hw.procTopTime
-                  }
-                  color: Qt.darker(root.baseColor, 1.4)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.bold: true
-                  anchors.verticalCenter: parent.verticalCenter
-                }
               }
 
               // Until the first list arrives, invisible placeholder rows keep

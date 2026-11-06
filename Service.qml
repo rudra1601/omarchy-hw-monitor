@@ -84,7 +84,6 @@ Item {
   property string osName: ""
   property real uptimeSec: -1
   onProcPanelOpenChanged: if (procPanelOpen) sampleSystem()
-  property string procTopTime: ""
   property bool procTopFailed: false
   property string procGroupedBy: "none"
   readonly property int topProcCount: intSetting("topProcCount", 6, 3, 12)
@@ -499,11 +498,6 @@ Item {
           root.procGroupedBy = res.groupedBy
           root.procTopFailed = false
           root._lastProcTopOk = Date.now()
-          var d = new Date(root._lastProcTopOk)
-          var hh = d.getHours()
-          var mm = d.getMinutes()
-          var ss = d.getSeconds()
-          root.procTopTime = (hh < 10 ? "0" + hh : "" + hh) + ":" + (mm < 10 ? "0" + mm : "" + mm) + ":" + (ss < 10 ? "0" + ss : "" + ss)
         } else {
           root.procTopFailed = true
         }
