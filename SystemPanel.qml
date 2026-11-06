@@ -32,6 +32,7 @@ KeyboardPanel {
   property var barOrder: Model.BAR_ITEMS
   property var sectionOrder: Model.PANEL_SECTIONS
   property var sectionsHidden: []
+  property var sectionsCollapsed: []
   property var dialOrder: Model.PANEL_DIALS
   property var dialsHidden: []
   property var diskHideMounts: Model.DISK_HIDE_DEFAULT
@@ -122,15 +123,27 @@ KeyboardPanel {
     persistSettings(changes)
   }
 
+  // A click on a card's header folds it down to the header; remembered in
+  // panelSectionsCollapsed. Folded cards skip their helper sampling.
+  function sectionCollapsed(key) {
+    return sectionsCollapsed.indexOf(key) !== -1
+  }
+
+  function toggleCollapsed(key) {
+    var collapse = !sectionCollapsed(key)
+    persistSetting("panelSectionsCollapsed", Model.setHidden(sectionsCollapsed, key, collapse))
+    if (!collapse) Qt.callLater(function() { root.refreshWorkers(true) })
+  }
+
   function moveSection(key, delta) {
     persistSetting("panelSections", Model.moveKey(sectionOrder, key, delta))
   }
 
   // Helpers sample only for sections that are on screen.
   function refreshWorkers(force) {
-    if (sectionShown("memory")) hw.sampleZram()
-    if (sectionShown("procs")) hw.refreshProcTop()
-    if (sectionShown("storage")) hw.refreshDisks(force)
+    if (sectionShown("memory") && !sectionCollapsed("memory")) hw.sampleZram()
+    if (sectionShown("procs") && !sectionCollapsed("procs")) hw.refreshProcTop()
+    if (sectionShown("storage") && !sectionCollapsed("storage")) hw.refreshDisks(force)
   }
 
   function dialData(key) {
@@ -831,16 +844,30 @@ KeyboardPanel {
             visible: root.sectionShown("history")
             Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            implicitHeight: sparklineCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("history") ? sparklineCol.children[0].implicitHeight : sparklineCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
             radius: Style.cornerRadius
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: sparklineCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("history")
+            }
+
             Column {
               id: sparklineCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(8)
 
               Row {
@@ -952,16 +979,30 @@ KeyboardPanel {
             visible: root.sectionShown("processor")
             Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            implicitHeight: procCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("processor") ? procCol.children[0].implicitHeight : procCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
             radius: Style.cornerRadius
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: procCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("processor")
+            }
+
             Column {
               id: procCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(10)
 
               Row {
@@ -1079,16 +1120,30 @@ KeyboardPanel {
             visible: root.sectionShown("memory")
             Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            implicitHeight: memCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("memory") ? memCol.children[0].implicitHeight : memCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
             radius: Style.cornerRadius
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: memCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("memory")
+            }
+
             Column {
               id: memCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(10)
 
               Row {
@@ -1313,7 +1368,9 @@ KeyboardPanel {
           // (only while the panel is open)
           Rectangle {
             width: parent.width
-            implicitHeight: diskCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("storage") ? diskCol.children[0].implicitHeight : diskCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1325,10 +1382,22 @@ KeyboardPanel {
 
             readonly property var diskList: Model.visibleDisks(hw.disks, root.diskHideMounts)
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: diskCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("storage")
+            }
+
             Column {
               id: diskCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(10)
 
               Row {
@@ -1487,7 +1556,9 @@ KeyboardPanel {
             y: sectionStack.offsetOf("procs")
             Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            implicitHeight: topProcCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("procs") ? topProcCol.children[0].implicitHeight : topProcCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
@@ -1495,10 +1566,22 @@ KeyboardPanel {
             visible: root.sectionShown("procs")
             opacity: hw.procTopFailed && hw.topProcs.length === 0 ? 0.7 : 1
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: topProcCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("procs")
+            }
+
             Column {
               id: topProcCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(8)
 
               Row {
@@ -1673,17 +1756,31 @@ KeyboardPanel {
             y: sectionStack.offsetOf("gpu")
             Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
             width: parent.width
-            implicitHeight: gpuCol.implicitHeight + Style.space(24)
+            implicitHeight: (root.sectionCollapsed("gpu") ? gpuCol.children[0].implicitHeight : gpuCol.implicitHeight) + Style.space(24)
+            clip: true
+            Behavior on implicitHeight { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.04)
             border.color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.10)
             border.width: 1
             radius: Style.cornerRadius
             visible: root.sectionShown("gpu")
 
+            // Header click folds/unfolds the card; declared first so the
+            // chips in the header (drawn above it) keep their own clicks.
+            MouseArea {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              height: gpuCol.children[0].implicitHeight + Style.space(18)
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleCollapsed("gpu")
+            }
+
             Column {
               id: gpuCol
               anchors.fill: parent
               anchors.margins: Style.space(12)
+              clip: true  // a folded card shows only the header row
               spacing: Style.space(10)
 
               Row {

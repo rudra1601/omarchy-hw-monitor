@@ -122,6 +122,8 @@ the bar:
   open (zero cost while closed).
 - **Graphics metrics** — full GPU card name, load, dynamic temperature color,
   VRAM meter, power draw (W), fan RPM, and clock speeds.
+- **Folding** — click a section's header to fold it down to the header and
+  back. The fold is remembered, and a folded section stops sampling.
 - **Layout (gear settings)** — *Items* orders the bar readouts, *Dials* the round gauges at the top of the panel, *Sections* the panel's cards. `‹ ›` / `↑ ↓` move an entry; clicking its name shows or hides it. Saved to the widget's `shell.json` entry like every other setting.
 - **Keyboard navigation** — `Escape` to close, `Tab`/`Shift+Tab` to switch
   panels, `r` to resample, `c`/`f` to toggle °C/°F.
@@ -219,6 +221,7 @@ omarchy bar set zoltanf.hw-monitor fahrenheit true --json
 | `diskHideMounts` | array/string | `["/boot", "/boot/efi", "/efi"]` | Mount points left out of the Storage section. |
 | `panelSections` | array/string | `dials,history,processor,memory,storage,procs,gpu` | Order of the panel sections. Missing ones are appended, so new sections never vanish. |
 | `panelSectionsHidden` | array/string | `[]` | Panel sections to hide. |
+| `panelSectionsCollapsed` | array/string | `[]` | Panel sections folded to their header. Clicking a section's header edits this; folded sections skip their sampling. |
 | `panelDials` | array/string | `cpu,ram,gpu` | Order of the round dials at the top of the panel. |
 | `panelDialsHidden` | array/string | `[]` | Dials to hide. |
 | `ramFormat` | string | `"used/total"` | `"used/total"` (`12/23G`), `"used"` (`12.3G`), `"percent"` (`52%`), `"free"` (`11.1G`), or `"available"` (`11.1G`). |

@@ -49,6 +49,7 @@
         "gpu"
       ],
       "panelSectionsHidden": [],
+      "panelSectionsCollapsed": [],
       "panelDials": [
         "cpu",
         "ram",
@@ -197,6 +198,13 @@
         "label": "Hidden panel sections",
         "defaultValue": "",
         "description": "Comma-separated panel sections to hide (dials, history, processor, memory, storage, procs, gpu)."
+      },
+      {
+        "key": "panelSectionsCollapsed",
+        "type": "string",
+        "label": "Folded panel sections",
+        "defaultValue": "",
+        "description": "Comma-separated panel sections shown folded to their header (history, processor, memory, storage, procs, gpu). Clicking a section's header edits this."
       },
       {
         "key": "panelDials",

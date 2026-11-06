@@ -81,6 +81,7 @@ Panel {
   readonly property var barOrder: Model.normalizeOrder(itemOrder, Model.BAR_ITEMS)
   readonly property var panelSections: Model.normalizeOrder(setting("panelSections", []), Model.PANEL_SECTIONS)
   readonly property var panelSectionsHidden: Model.keyList(setting("panelSectionsHidden", []))
+  readonly property var panelSectionsCollapsed: Model.keyList(setting("panelSectionsCollapsed", []))
   readonly property var panelDials: Model.normalizeOrder(setting("panelDials", []), Model.PANEL_DIALS)
   readonly property var panelDialsHidden: Model.keyList(setting("panelDialsHidden", []))
   readonly property var diskHideMounts: Model.stringList(setting("diskHideMounts", Model.DISK_HIDE_DEFAULT))
@@ -609,6 +610,7 @@ Panel {
     barOrder: root.barOrder
     sectionOrder: root.panelSections
     sectionsHidden: root.panelSectionsHidden
+    sectionsCollapsed: root.panelSectionsCollapsed
     dialOrder: root.panelDials
     dialsHidden: root.panelDialsHidden
     diskHideMounts: root.diskHideMounts
