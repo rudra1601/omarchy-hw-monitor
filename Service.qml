@@ -189,7 +189,17 @@ Item {
     uptimeSec = Model.parseUptime(uptimeFile.text())
   }
 
+  // Emitted after every sample, so the open panel can follow the same tick
+  // instead of running a sampling timer of its own.
+  signal sampled()
+
   function sample() {
+    if (_destroyed) return
+    readSensors()
+    sampled()
+  }
+
+  function readSensors() {
     if (procPanelOpen) sampleSystem()
     statFile.reload()
     var jiffies = Model.parseCpuJiffies(statFile.text())
@@ -722,7 +732,9 @@ Item {
 
   Timer {
     id: sampleTimer
-    interval: root.intervalSec * 1000
+    // One tick a second while the panel is open (its CPU history is per
+    // second), the configured interval otherwise.
+    interval: root.procPanelOpen ? Math.min(1000, root.intervalSec * 1000) : root.intervalSec * 1000
     running: root.active
     repeat: true
     onTriggered: {

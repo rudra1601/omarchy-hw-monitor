@@ -224,8 +224,8 @@ KeyboardPanel {
     var list = []
     var n = cpuHistory ? cpuHistory.length : 0
     if (n < 2) return list
-    var w = sparklineBox.width - Style.space(8)
-    var h = sparklineBox.height - Style.space(8)
+    var w = root.sparklineWidth - Style.space(8)
+    var h = root.sparklineHeight - Style.space(8)
     for (var i = 0; i < n; i++) {
       var px = Style.space(4) + (i / (n - 1)) * w
       var v = Math.max(0, Math.min(100, Number(cpuHistory[i]) || 0))
@@ -235,13 +235,13 @@ KeyboardPanel {
     return list
   }
 
-  readonly property point sparklineFirst: sparklinePoints.length > 0 ? sparklinePoints[0] : Qt.point(0, sparklineBox.height)
+  readonly property point sparklineFirst: sparklinePoints.length > 0 ? sparklinePoints[0] : Qt.point(0, root.sparklineHeight)
 
   readonly property var sparklineFillPoints: {
     if (sparklinePoints.length < 2) return []
     var list = sparklinePoints.slice()
-    var w = sparklineBox.width - Style.space(4)
-    var h = sparklineBox.height - Style.space(4)
+    var w = root.sparklineWidth - Style.space(4)
+    var h = root.sparklineHeight - Style.space(4)
     list.push(Qt.point(w, h))
     list.push(Qt.point(Style.space(4), h))
     return list
@@ -261,12 +261,39 @@ KeyboardPanel {
     }
   }
 
-  focusTarget: keyCatcher
-  contentWidth: fittedContentWidth(Style.space(500))
-  contentHeight: fittedContentHeight(panelColumn.implicitHeight + Style.space(16), Style.space(1100))
+  // The sampler ticks once a second while the panel is open; each tick adds a
+  // history point and lets the panel's helpers (processes, disks) run when
+  // their own throttles allow.
+  // (A property, not a child: KeyboardPanel's default property takes Items.)
+  property QtObject historyFollower: Connections {
+    target: root.hw
+    enabled: root.open
+    function onSampled() {
+      root.refreshWorkers(false)
+      var cur = hw.cpuPercent >= 0 ? hw.cpuPercent : 0
+      var arr = root.cpuHistory.slice()
+      arr.push(cur)
+      if (arr.length > 60) arr.shift()
+      root.cpuHistory = arr
+    }
+  }
 
-  PanelKeyCatcher {
+  // The panel body is built when the panel opens and destroyed once it has
+  // faded out: kept alive while closed, its bindings would follow every
+  // sample for nothing. KeyboardPanel sets contentRequested on open.
+  onVisibleChanged: if (!visible && !open) contentRequested = false
+
+  readonly property real sparklineWidth: loadedContent && loadedContent.sparklineBox ? loadedContent.sparklineBox.width : 0
+  readonly property real sparklineHeight: loadedContent && loadedContent.sparklineBox ? loadedContent.sparklineBox.height : 0
+
+  focusTarget: root.loadedContent
+  contentWidth: fittedContentWidth(Style.space(500))
+  contentHeight: fittedContentHeight(root.loadedContentHeight, Style.space(1100))
+
+  content: PanelKeyCatcher {
     id: keyCatcher
+    property alias sparklineBox: sparklineBox
+    implicitHeight: panelColumn.implicitHeight + Style.space(16)
     anchors.fill: parent
     onCloseRequested: root.close()
     // root.owner is the Panel widget root (Widget.qml sets owner: root),
@@ -286,24 +313,6 @@ KeyboardPanel {
         root.settingsOpen = !root.settingsOpen
       }
     }
-
-    Timer {
-      id: historyTimer
-      interval: 1000
-      repeat: true
-      running: root.open
-      onTriggered: {
-        hw.sample()
-        root.refreshWorkers(false)
-        var cur = hw.cpuPercent >= 0 ? hw.cpuPercent : 0
-        var arr = root.cpuHistory.slice()
-        arr.push(cur)
-        if (arr.length > 60) arr.shift()
-        root.cpuHistory = arr
-      }
-    }
-
-    Component.onDestruction: historyTimer.stop()
 
     Controls.ScrollView {
       id: scrollArea

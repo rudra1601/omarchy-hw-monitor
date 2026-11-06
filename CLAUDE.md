@@ -39,6 +39,22 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
 
 ## Design
 
+- One sampler per bar entry across monitors (2026-11-06): `Widget.samplerWidget`
+  is the first copy in `bar.moduleWidgets(moduleName)` that is `onThisScreen`;
+  only its `Service` is active, the others bind `hw` to it. Verified with a
+  temporary log line on two monitors (one Service sampling) and by moving the
+  `monitors` setting between screens. Not exercised: the sampler copy being
+  destroyed (unplugging the monitor whose copy samples); `samplerHw` is a
+  QtObject property so it nulls and falls back to the own Service meanwhile.
+- `SystemPanel` content is lazy (`content: PanelKeyCatcher {...}`) and unloaded
+  after the fade-out (`contentRequested = false` in `onVisibleChanged`). Root
+  code must not reference content ids; use `loadedContent` (see the sparkline
+  size properties). Non-Item helpers at the panel root go in a property
+  (`historyFollower`), not as children: the default property takes Items.
+- While the panel is open the Service ticks at 1 s and emits `sampled()`; the
+  panel's history and helper refresh follow that signal (no timer of its own).
+- Measuring: whole-shell CPU varies ±1-2% between 40 s windows on this laptop
+  while it is in use, so A/B numbers need interleaved runs.
 - `disk-probe` (bash) runs `findmnt --real` twice — local filesystems, then
   network types under `timeout -s KILL 3` so a dead NFS server cannot hold back
   the local rows — plus `lsblk` for the parent-disk model/removable flag.

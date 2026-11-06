@@ -213,11 +213,32 @@ Panel {
 
   // --------------------------------------------------------------- readings
 
+  // Each monitor's bar builds its own copy of this widget, and only one copy
+  // samples: the first in the bar's list that draws on its screen. The others
+  // show its readings. bar.moduleWidgets() reads the bar's host list, so this
+  // re-runs when a copy comes or goes (a monitor plugged or unplugged) and the
+  // next copy takes over.
   Service {
-    id: hw
+    id: ownService
     settings: root.settings
-    active: root.onThisScreen
+    active: root.onThisScreen && root.sampling
   }
+
+  readonly property QtObject ownHw: ownService
+  readonly property var samplerWidget: {
+    var items = bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
+    for (var i = 0; i < items.length; i++) {
+      var w = items[i]
+      if (w && w.onThisScreen === true && w.ownHw) return w
+    }
+    return root
+  }
+  readonly property bool sampling: samplerWidget === root
+  // A QtObject property drops to null when its object is destroyed, so a
+  // copy whose sampler is torn down falls back to its own (idle) service
+  // until the binding above names the next sampler.
+  readonly property QtObject samplerHw: samplerWidget ? samplerWidget.ownHw : null
+  readonly property QtObject hw: samplerHw ? samplerHw : ownService
 
   function percentPadFor(value) {
     if (percentPad !== "zero") return ""
@@ -598,7 +619,7 @@ Panel {
     bar: root.bar
     owner: root
     open: root.opened
-    hw: hw
+    hw: root.hw
     mode: root.mode
     showGpu: root.showGpu
     showCpu: root.showCpu

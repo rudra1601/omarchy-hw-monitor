@@ -285,6 +285,11 @@ Waybar custom module does: the widget reads them directly with `FileView`, which
 is what makes a two-second interval reasonable for something that runs for the
 life of your session.
 
+With more than one monitor, each bar draws its own copy of the widget, but
+only one copy samples and the others show its readings. The system panel is
+built when it opens and dropped once it closes, and while it is open the
+widget samples once a second, which also feeds the CPU history.
+
 `blockAllReads` is set on those views deliberately. Without it `reload()` is
 asynchronous and `text()` returns the *previous* tick's contents, so every
 readout lags a full interval. These are kernel-generated files of a few KB, so
