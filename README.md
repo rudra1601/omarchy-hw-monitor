@@ -271,6 +271,7 @@ the last two only while the system panel is open.
 | CPU clock | `/proc/cpuinfo` | mean across every thread |
 | CPU temperature | `hwmon` | die/package sensor, picked by scoring (`k10temp` `Tdie`/`Tctl`, `coretemp` `Package id 0`, `zenpower`, ThinkPad, ARM SoC, then `acpitz`) |
 | GPU | the card's own `sysfs` | load, edge temperature, VRAM, board power, fan, core clock |
+| Apple silicon GPU | `<card>/device/agx_stats` (asahi driver, Omarchy's `linux-aurora` kernel) | load (firmware `util1`, else `busy_ns` deltas), temperature, power. Only used when the file holds the firmware figures; a field missing from one read keeps its last value |
 | Load average | `/proc/loadavg` | 1/5/15 minute |
 | Storage | `findmnt` + `lsblk`, via [`disk-probe`](disk-probe) | size, used and available per mounted filesystem (percent as `df` computes it), disk model, removable or network |
 | Browser tab hints | `/proc/<pid>/mem` of Chromium-family processes | read-only, and only for the processes the kernel lets the shell attach to. With the Group toggle off, the most frequent host in the renderer's memory becomes the `[domain]` tag, and rows read `[tab]` when the attach is refused or nothing was found |

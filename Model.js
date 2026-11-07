@@ -108,7 +108,7 @@ function parseProbe(raw) {
     var gpus = []
     var rawGpus = parsed.gpus instanceof Array ? parsed.gpus : []
     var PATH_KEYS = ["busyPath", "vramUsedPath", "vramTotalPath", "tempPath",
-                     "powerPath", "fanPath", "clockPath"]
+                     "powerPath", "fanPath", "clockPath", "agxStatsPath"]
     for (var i = 0; i < rawGpus.length; i++) {
       var g = rawGpus[i]
       if (!g || typeof g !== "object") continue
@@ -315,6 +315,34 @@ function formatRatio(stored, cost) {
 // nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,
 // memory.total,power.draw --format=csv,noheader,nounits
 // Unsupported fields come back as "[N/A]".
+
+// ------------------------------------------------------------------ asahi
+//
+// Apple silicon GPUs on Asahi Linux: <card>/device/agx_stats holds
+// "key value" lines. util1 is the firmware's own load figure (the one its clock
+// governor uses); busy_ns is a running busy-time counter, kept for when util1
+// is absent. Temperature is hundredths of a degree times temperature_scale.
+// The file sometimes holds only memory figures, so every field is optional and
+// a missing one comes back as -1.
+function parseAgxStats(raw) {
+  var out = { util: -1, busyNs: -1, tempC: -1, watts: -1 }
+  var text = String(raw || "")
+  if (text.length > 65536) return out
+  var values = {}
+  var lines = text.split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var m = /^([a-z0-9_]+) ([0-9]+)$/.exec(lines[i].trim())
+    if (m) values[m[1]] = Number(m[2])
+  }
+  if (values.util1 !== undefined) out.util = Math.max(0, Math.min(100, values.util1))
+  if (values.busy_ns !== undefined) out.busyNs = values.busy_ns
+  if (values.temperature_raw !== undefined && values.temperature_scale > 0) {
+    var c = values.temperature_raw / values.temperature_scale / 100
+    if (c > 0 && c < 150) out.tempC = c
+  }
+  if (values.power_mw !== undefined) out.watts = values.power_mw / 1000
+  return out
+}
 
 function parseNvidia(raw) {
   var line = String(raw || "").trim().split("\n")[0]

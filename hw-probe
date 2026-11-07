@@ -152,6 +152,15 @@ gpu_name_for() {
     name=$(trim "$name")
     [[ -n $name ]] && { printf '%s' "$name"; return; }
   fi
+  # Apple silicon GPUs are not on PCI; the chip name is in the machine model
+  # ("Apple MacBook Air (13-inch, M2, 2022)" -> "Apple M2 GPU").
+  if [[ $driver == asahi ]]; then
+    local model chip
+    model=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null)
+    chip=$(grep -oE '\bM[0-9]+( Pro| Max| Ultra)?\b' <<<"$model" | head -1)
+    printf '%s' "Apple ${chip:+$chip }GPU"
+    return
+  fi
   printf '%s' "${driver:-GPU}"
 }
 
@@ -197,6 +206,11 @@ for card in /sys/class/drm/card[0-9]*; do
   entry+="$(field_path busyPath "$dev/gpu_busy_percent")"
   entry+="$(field_path vramUsedPath "$dev/mem_info_vram_used")"
   entry+="$(field_path vramTotalPath "$dev/mem_info_vram_total")"
+  # Asahi (Apple silicon) puts load, power and temperature in one key/value
+  # file. Only worth a slot when the driver exports the firmware figures.
+  if [[ $driver == asahi ]] && grep -qE '^(util1|busy_ns) ' "$dev/agx_stats" 2>/dev/null; then
+    entry+="$(field_path agxStatsPath "$dev/agx_stats")"
+  fi
   if [[ -n $hw ]]; then
     entry+="$(field_path tempPath "$(gpu_temp_for "$hw")")"
     # power1_average is the running average board draw; power1_input is the
@@ -213,11 +227,11 @@ for card in /sys/class/drm/card[0-9]*; do
   entry+="}"
 
   # A card that reports neither load nor temperature is not worth a slot.
-  [[ $entry == *busyPath* || $entry == *tempPath* ]] || continue
+  [[ $entry == *busyPath* || $entry == *tempPath* || $entry == *agxStatsPath* ]] || continue
 
   # Cards that report load sort first: on a laptop with an iGPU and a dGPU the
   # one with a busy counter is the one the user means by "GPU".
-  if [[ $entry == *busyPath* ]]; then
+  if [[ $entry == *busyPath* || $entry == *agxStatsPath* ]]; then
     gpu_entries=("$entry" "${gpu_entries[@]+"${gpu_entries[@]}"}")
   else
     gpu_entries+=("$entry")

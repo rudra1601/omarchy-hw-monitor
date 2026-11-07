@@ -230,6 +230,8 @@ Item {
       return
     }
 
+    if (gpuAgxFile.path !== "") sampleAgx()
+
     if (gpuBusyFile.path !== "") {
       gpuBusyFile.reload()
       gpuPercent = readNumber(gpuBusyFile, 0)
@@ -286,6 +288,27 @@ Item {
     total.algorithm = algorithms.join(", ")
     total.label = devices.length === 1 ? String(devices[0].name) : devices.length + " devices"
     zram = total
+  }
+
+  // Apple silicon (Asahi): one stats file for load, power and temperature.
+  // A field missing from this read keeps its previous value.
+  property real _agxPrevBusyNs: -1
+  property real _agxPrevMs: 0
+  function sampleAgx() {
+    gpuAgxFile.reload()
+    var s = Model.parseAgxStats(gpuAgxFile.text())
+    var now = Date.now()
+    if (s.util >= 0) {
+      gpuPercent = s.util
+    } else if (s.busyNs >= 0 && _agxPrevBusyNs >= 0 && s.busyNs >= _agxPrevBusyNs && now > _agxPrevMs) {
+      gpuPercent = Math.min(100, (s.busyNs - _agxPrevBusyNs) / 1e4 / (now - _agxPrevMs))
+    }
+    if (s.busyNs >= 0) {
+      _agxPrevBusyNs = s.busyNs
+      _agxPrevMs = now
+    }
+    if (s.tempC >= 0) gpuTempC = s.tempC
+    if (s.watts >= 0) gpuWatts = s.watts
   }
 
   function sampleNvidia() {
@@ -394,6 +417,12 @@ Item {
 
   // A GPU sensor the card does not expose leaves its path empty, and sample()
   // skips it — the widget then renders a dash rather than a fake zero.
+  FileView {
+    id: gpuAgxFile
+    path: root.hasGpu && root.gpuInfo.agxStatsPath ? String(root.gpuInfo.agxStatsPath) : ""
+    blockAllReads: true
+    printErrors: false
+  }
   FileView {
     id: gpuBusyFile
     path: root.hasGpu && root.gpuInfo.busyPath ? String(root.gpuInfo.busyPath) : ""
