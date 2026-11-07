@@ -38,8 +38,11 @@ Item {
 
   readonly property int intervalSec: intSetting("refreshIntervalSec", 2, 1, 60)
   // On battery the bar samples less often; never faster than the interval above.
-  readonly property int batteryIntervalSec: intSetting("batteryRefreshIntervalSec", 3, 1, 60)
-  readonly property int sampleIntervalSec: UPower.onBattery ? Math.max(intervalSec, batteryIntervalSec) : intervalSec
+  readonly property real batteryIntervalSec: numSetting("batteryRefreshIntervalSec", 3.5, 1, 60)
+  readonly property real sampleIntervalSec: UPower.onBattery ? Math.max(intervalSec, batteryIntervalSec) : intervalSec
+  // The open panel ticks every second (every 2 s on battery), never slower
+  // than the bar.
+  readonly property real panelIntervalSec: Math.min(UPower.onBattery ? 2 : 1, sampleIntervalSec)
 
   // ------------------------------------------------------------- discovery
 
@@ -150,6 +153,12 @@ Item {
   function setting(name, fallback) {
     var value = settings ? settings[name] : undefined
     return value === undefined || value === null ? fallback : value
+  }
+
+  function numSetting(name, fallback, min, max) {
+    var n = parseFloat(String(setting(name, fallback)))
+    if (!isFinite(n)) n = fallback
+    return Math.max(min, Math.min(max, n))
   }
 
   function intSetting(name, fallback, min, max) {
@@ -773,9 +782,9 @@ Item {
 
   Timer {
     id: sampleTimer
-    // One tick a second while the panel is open (its CPU history is per
-    // second), the configured interval otherwise.
-    interval: root.procPanelOpen ? Math.min(1000, root.sampleIntervalSec * 1000) : root.sampleIntervalSec * 1000
+    // panelIntervalSec while the panel is open (its CPU history is one point
+    // per tick), the configured interval otherwise.
+    interval: Math.round((root.procPanelOpen ? root.panelIntervalSec : root.sampleIntervalSec) * 1000)
     running: root.active && !root.idlePaused
     repeat: true
     onTriggered: {

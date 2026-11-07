@@ -296,7 +296,7 @@ KeyboardPanel {
     }
   }
 
-  // The sampler ticks once a second while the panel is open; each tick adds a
+  // The sampler ticks every hw.panelIntervalSec while the panel is open; each tick adds a
   // history point and lets the panel's helpers (processes, disks) run when
   // their own throttles allow.
   // Layout animations (sections sliding, cards folding, bars filling) stay off
@@ -325,7 +325,8 @@ KeyboardPanel {
       var cur = hw.cpuPercent >= 0 ? hw.cpuPercent : 0
       var arr = root.cpuHistory.slice()
       arr.push(cur)
-      if (arr.length > 60) arr.shift()
+      // Keep 60 s of points whatever the tick (1 s, or 2 s on battery).
+      while (arr.length > Math.max(2, Math.round(60 / hw.panelIntervalSec))) arr.shift()
       root.cpuHistory = arr
     }
   }

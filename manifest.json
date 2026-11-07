@@ -24,7 +24,7 @@
       "mode": "icons",
       "itemsOrder": "gpu,cpu,cpu-temp,ram",
       "refreshIntervalSec": 2,
-      "batteryRefreshIntervalSec": 3,
+      "batteryRefreshIntervalSec": 3.5,
       "showGpu": true,
       "showCpu": true,
       "showCpuTemp": true,
@@ -309,13 +309,13 @@
       },
       {
         "key": "batteryRefreshIntervalSec",
-        "type": "integer",
+        "type": "number",
         "label": "Sample interval on battery (seconds)",
         "min": 1,
         "max": 60,
-        "step": 1,
-        "defaultValue": 3,
-        "description": "Used while the laptop runs on battery. Never faster than the sample interval above."
+        "step": 0.5,
+        "defaultValue": 3.5,
+        "description": "Used while the laptop runs on battery. Never faster than the sample interval above. The open panel samples every 2 s on battery."
       },
       {
         "key": "gpuIcon",

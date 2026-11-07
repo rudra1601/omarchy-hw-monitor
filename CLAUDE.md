@@ -31,6 +31,10 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
   Verified on battery: status-text changes over IPC came about 3.0 s apart,
   with a few extra samples in between (idle resume, which calls `sample()`
   outside the timer). Not exercised: switching back to 2 s on AC.
+  Later the same day: default 3 → 3.5 s (setting now a `number`, parsed
+  with `numSetting`/`parseFloat`), and the open panel ticks every 2 s on
+  battery (`panelIntervalSec`; 1 s on AC). The CPU history keeps 60 s of
+  points at either tick, so its "60s" label stays true.
 - Added: Storage section (panel only); layout controls in the gear drawer
   (order + show/hide for bar items, panel dials, panel sections); `/boot`,
   `/boot/efi`, `/efi` hidden from Storage by default (`diskHideMounts`).
