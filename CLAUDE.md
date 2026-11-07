@@ -25,6 +25,12 @@ Git remotes: `origin` = the fork, `upstream` = meviusisback.
   (zram from `mm_stat`, devices found by `hw-probe` via `/proc/swaps`;
   zswap from `/proc/meminfo`). zswap path untested (off on the author's
   laptop).
+- 2026-11-07: on battery (`UPower.onBattery`) the bar samples every
+  `batteryRefreshIntervalSec` (default 3 s; the larger of it and
+  `refreshIntervalSec` applies). The open panel still ticks every second.
+  Verified on battery: status-text changes over IPC came about 3.0 s apart,
+  with a few extra samples in between (idle resume, which calls `sample()`
+  outside the timer). Not exercised: switching back to 2 s on AC.
 - Added: Storage section (panel only); layout controls in the gear drawer
   (order + show/hide for bar items, panel dials, panel sections); `/boot`,
   `/boot/efi`, `/efi` hidden from Storage by default (`diskHideMounts`).

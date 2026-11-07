@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import Quickshell.Services.UPower
 import Quickshell.Wayland
 import "Model.js" as Model
 
@@ -36,6 +37,9 @@ Item {
   readonly property string probePath: pluginDir + "/hw-probe"
 
   readonly property int intervalSec: intSetting("refreshIntervalSec", 2, 1, 60)
+  // On battery the bar samples less often; never faster than the interval above.
+  readonly property int batteryIntervalSec: intSetting("batteryRefreshIntervalSec", 3, 1, 60)
+  readonly property int sampleIntervalSec: UPower.onBattery ? Math.max(intervalSec, batteryIntervalSec) : intervalSec
 
   // ------------------------------------------------------------- discovery
 
@@ -771,7 +775,7 @@ Item {
     id: sampleTimer
     // One tick a second while the panel is open (its CPU history is per
     // second), the configured interval otherwise.
-    interval: root.procPanelOpen ? Math.min(1000, root.intervalSec * 1000) : root.intervalSec * 1000
+    interval: root.procPanelOpen ? Math.min(1000, root.sampleIntervalSec * 1000) : root.sampleIntervalSec * 1000
     running: root.active && !root.idlePaused
     repeat: true
     onTriggered: {

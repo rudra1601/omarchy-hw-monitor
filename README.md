@@ -184,6 +184,7 @@ Settings are read from this widget's entry in `~/.config/omarchy/shell.json`:
   "id": "zoltanf.hw-monitor",
   "mode": "icons",
   "refreshIntervalSec": 2,
+  "batteryRefreshIntervalSec": 3,
   "showRam": true,
   "showCpu": true,
   "showGpu": true,
@@ -245,6 +246,7 @@ omarchy bar set zoltanf.hw-monitor fahrenheit true --json
 | `tempIconRotation` | int | `0` | Rotate the temperature glyph (0, 90, 180, 270). |
 | `ramIconRotation` | int | `0` | Rotate the memory glyph (0, 90, 180, 270). |
 | `refreshIntervalSec` | int | `2` | Seconds between samples. `1` is as fast as `FileView` makes sense; `5` is plenty for a background bar. |
+| `batteryRefreshIntervalSec` | int | `3` | Seconds between samples while the laptop runs on battery; the larger of this and `refreshIntervalSec` applies. The open panel still ticks every second. |
 | `gpu` | string | `"auto"` | `"auto"` picks the card reporting load; otherwise an index (`0`, `1`) or name substring. |
 | `warnPercent` | int | `70` | Load threshold where numbers and glyphs warm toward the urgent colour. |
 | `criticalPercent` | int | `90` | Load threshold where the gauge glows and color reaches full urgent. |
