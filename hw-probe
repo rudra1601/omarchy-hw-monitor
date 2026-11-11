@@ -164,6 +164,31 @@ gpu_name_for() {
   printf '%s' "${driver:-GPU}"
 }
 
+# Big-endian device-tree cell(s) as one unsigned number.
+dt_number() {
+  local hex
+  hex=$(od -An -tx1 -v "$1" 2>/dev/null | tr -d ' \n')
+  [[ $hex =~ ^[0-9a-f]{1,16}$ ]] || return 1
+  printf '%d' "$((16#$hex))"
+}
+
+# Asahi: the clock of each GPU pstate, in MHz, as a JSON array indexed by the
+# pstate number in agx_stats (opp00 is the "off" state at 0 Hz). The GPU's
+# device-tree node names its OPP table by phandle.
+agx_clocks_for() {
+  local dev=$1 want table opp hz list=""
+  want=$(dt_number "$dev/of_node/operating-points-v2") || return 0
+  for table in /proc/device-tree/opp-table*; do
+    [[ $(dt_number "$table/phandle") == "$want" ]] || continue
+    for opp in "$table"/opp*/; do
+      hz=$(dt_number "$opp/opp-hz") || return 0
+      list+="$((hz / 1000000)), "
+    done
+    [[ -n $list ]] && printf '"agxClocksMhz": [%s], ' "${list%, }"
+    return 0
+  done
+}
+
 # amdgpu exposes three temperatures (edge, junction, mem). Edge is the one
 # every tool reports as "the" GPU temperature.
 gpu_temp_for() {
@@ -210,6 +235,7 @@ for card in /sys/class/drm/card[0-9]*; do
   # file. Only worth a slot when the driver exports the firmware figures.
   if [[ $driver == asahi ]] && grep -qE '^(util1|busy_ns) ' "$dev/agx_stats" 2>/dev/null; then
     entry+="$(field_path agxStatsPath "$dev/agx_stats")"
+    entry+="$(agx_clocks_for "$dev")"
   fi
   if [[ -n $hw ]]; then
     entry+="$(field_path tempPath "$(gpu_temp_for "$hw")")"

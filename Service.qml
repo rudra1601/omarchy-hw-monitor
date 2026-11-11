@@ -307,11 +307,32 @@ Item {
   // A field missing from this read keeps its previous value.
   property real _agxPrevBusyNs: -1
   property real _agxPrevMs: 0
+  property real _agxPrevMhz: -1
+  // Share of the GPU's full capacity in use: busy time over the interval,
+  // scaled by clock / max clock. util1 (the firmware's figure) is relative to
+  // the current clock, and the firmware lowers the clock until the GPU is ~85%
+  // busy, so it reads 50-100% at idle. pstate is a point sample, so the clock
+  // is the mean of the readings at both ends of the interval.
+  function agxClockMhz(pstate) {
+    var clocks = gpuInfo ? gpuInfo.agxClocksMhz : undefined
+    if (!clocks || pstate < 0 || pstate >= clocks.length) return -1
+    return clocks[pstate]
+  }
   function sampleAgx() {
     gpuAgxFile.reload()
     var s = Model.parseAgxStats(gpuAgxFile.text())
     var now = Date.now()
-    if (s.util >= 0) {
+    var mhz = agxClockMhz(s.pstate)
+    var clocks = gpuInfo ? gpuInfo.agxClocksMhz : undefined
+    var maxMhz = clocks ? Math.max.apply(null, clocks) : 0
+    if (mhz >= 0 && maxMhz > 0) {
+      if (s.busyNs >= _agxPrevBusyNs && _agxPrevBusyNs >= 0 && _agxPrevMhz >= 0 && now > _agxPrevMs) {
+        var busyShare = Math.min(1, (s.busyNs - _agxPrevBusyNs) / 1e6 / (now - _agxPrevMs))
+        gpuPercent = Math.min(100, busyShare * 100 * ((mhz + _agxPrevMhz) / 2) / maxMhz)
+      }
+      _agxPrevMhz = mhz
+      gpuMhz = mhz // pstate 0 is 0 MHz (GPU off), which shows as "–"
+    } else if (s.util >= 0) {
       gpuPercent = s.util
     } else if (s.busyNs >= 0 && _agxPrevBusyNs >= 0 && s.busyNs >= _agxPrevBusyNs && now > _agxPrevMs) {
       gpuPercent = Math.min(100, (s.busyNs - _agxPrevBusyNs) / 1e4 / (now - _agxPrevMs))

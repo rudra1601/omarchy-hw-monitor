@@ -127,6 +127,17 @@ function parseProbe(raw) {
           && g.nvidiaPath.indexOf("..") === -1) {
         gpu.nvidiaPath = g.nvidiaPath
       }
+      // Asahi pstate clocks in MHz, indexed by pstate. All-or-nothing: one bad
+      // entry would shift every pstate onto the wrong clock.
+      if (g.agxClocksMhz instanceof Array && g.agxClocksMhz.length > 1 && g.agxClocksMhz.length <= 32) {
+        var clocks = []
+        for (var c = 0; c < g.agxClocksMhz.length; c++) {
+          var mhz = g.agxClocksMhz[c]
+          if (typeof mhz !== "number" || !isFinite(mhz) || mhz < 0 || mhz > 10000) { clocks = null; break }
+          clocks.push(mhz)
+        }
+        if (clocks && Math.max.apply(null, clocks) > 0) gpu.agxClocksMhz = clocks
+      }
       for (var k = 0; k < PATH_KEYS.length; k++) {
         var path = safePath(g[PATH_KEYS[k]])
         if (path !== undefined) gpu[PATH_KEYS[k]] = path
@@ -325,7 +336,7 @@ function formatRatio(stored, cost) {
 // The file sometimes holds only memory figures, so every field is optional and
 // a missing one comes back as -1.
 function parseAgxStats(raw) {
-  var out = { util: -1, busyNs: -1, tempC: -1, watts: -1 }
+  var out = { util: -1, busyNs: -1, pstate: -1, tempC: -1, watts: -1 }
   var text = String(raw || "")
   if (text.length > 65536) return out
   var values = {}
@@ -336,6 +347,7 @@ function parseAgxStats(raw) {
   }
   if (values.util1 !== undefined) out.util = Math.max(0, Math.min(100, values.util1))
   if (values.busy_ns !== undefined) out.busyNs = values.busy_ns
+  if (values.pstate !== undefined) out.pstate = values.pstate
   if (values.temperature_raw !== undefined && values.temperature_scale > 0) {
     var c = values.temperature_raw / values.temperature_scale / 100
     if (c > 0 && c < 150) out.tempC = c
@@ -445,7 +457,8 @@ function formatGhzShort(mhz) {
 
 function formatWatts(watts) {
   if (!isFinite(watts) || watts < 0) return "–"
-  return Math.round(watts) + " W"
+  // One decimal below 10 W: laptop and Apple GPUs idle under 1 W.
+  return (watts < 9.95 ? watts.toFixed(1) : Math.round(watts)) + " W"
 }
 
 function formatRpm(rpm) {
